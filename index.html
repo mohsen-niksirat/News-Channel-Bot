@@ -143,8 +143,8 @@ footer .links{margin-bottom:10px}
 
 <!-- ============ LANG SWITCH ============ -->
 <div class="lang-switch" role="group" aria-label="Language">
-  <button type="button" data-lang="fa" class="on" onclick="setLang('fa')">فارسی</button>
-  <button type="button" data-lang="en" onclick="setLang('en')">English</button>
+  <button type="button" data-setlang="fa" class="on" onclick="setLang('fa')">فارسی</button>
+  <button type="button" data-setlang="en" onclick="setLang('en')">English</button>
 </div>
 
 <!-- ============ HERO ============ -->
@@ -524,7 +524,7 @@ AI_KEYS=deepseek=<span class="s">AI key (step 4)</span></pre>
     </p>
 
     <div class="opt-grid">
-      <div class="opt"><h4>🚀 Deployka <span class="rec"><span data-lang="fa">پیشنهادی — همین راهنما با آن تست شده</span><span class="en" data-lang="en">recommended — tested here</span></span></h4>
+      <div class="opt"><h4>🚀 Deployka <span class="rec"><span data-lang="fa">پیشنهادی — همین راهنما با آن تست شده</span><span data-lang="en">recommended — tested here</span></span></h4>
         <p><span data-lang="fa"><a href="https://deployka.dev/" target="_blank" rel="noopener">deployka.dev</a> — پنل ساده، بدون سرور. <b>نسخه رایگان ۱۲۸ مگابایت رم</b> می‌دهد که برای این بات کافی است. کافیست سرویس Python بسازید، ریپو را وصل کنید، ۴ متغیر محیطی را وارد کنید و Start Command را <code>python main.py</code> بگذارید.</span>
         <span data-lang="en"><a href="https://deployka.dev/" target="_blank" rel="noopener">deployka.dev</a> — simple panel, no server. <b>The free tier gives 128 MB of RAM</b>, enough for this bot. Create a Python service, connect the repo, add the 4 env vars, and set Start Command to <code>python main.py</code>.</span></p></div>
       <div class="opt"><h4>🖥 VPS + systemd <span class="rec"><span data-lang="fa">ارزان‌ترین</span><span data-lang="en">cheapest</span></span></h4>
@@ -602,6 +602,11 @@ journalctl -u newschannelbot -f   <span class="c"># live logs</span></pre>
 </div>
 
 <script>
+/* ---------- safe localStorage (sandboxed iframes / private mode may throw) ---------- */
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+
 /* ---------- language switching ---------- */
 const TITLES = {
   fa: 'NewsChannelBot — آموزش پیاده‌سازی گام‌به‌گام',
@@ -609,18 +614,20 @@ const TITLES = {
 };
 
 function setLang(lang){
+  if(!TITLES[lang]) return;
   document.documentElement.lang = lang;
   document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
   document.title = TITLES[lang];
-  localStorage.setItem('ncb_lang', lang);
+  lsSet('ncb_lang', lang);
   document.querySelectorAll('.lang-switch button').forEach(b =>
-    b.classList.toggle('on', b.dataset.lang === lang));
+    b.classList.toggle('on', b.dataset.setlang === lang));
   updateUI();
 }
 
 function initLang(){
-  const saved = localStorage.getItem('ncb_lang');
-  const browser = (navigator.language || 'fa').toLowerCase().startsWith('fa') ? 'fa' : 'en';
+  const saved = lsGet('ncb_lang');
+  let browser = 'fa';
+  try{ browser = (navigator.language || 'fa').toLowerCase().startsWith('fa') ? 'fa' : 'en'; }catch(e){}
   setLang(saved || browser);
 }
 
@@ -629,8 +636,8 @@ const TOTAL = 7;
 const boxes = [...document.querySelectorAll('input[data-step]')];
 const steps = [...document.querySelectorAll('.step')];
 
-function loadState(){ try{ return JSON.parse(localStorage.getItem('ncb_tutorial')||'{}'); }catch(e){ return {}; } }
-function saveState(s){ localStorage.setItem('ncb_tutorial', JSON.stringify(s)); }
+function loadState(){ try{ return JSON.parse(lsGet('ncb_tutorial')||'{}'); }catch(e){ return {}; } }
+function saveState(s){ lsSet('ncb_tutorial', JSON.stringify(s)); }
 
 const faDigits = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
 
@@ -664,7 +671,7 @@ boxes.forEach(b => b.addEventListener('change', () => {
   updateUI();
 }));
 
-function resetProgress(){ localStorage.removeItem('ncb_tutorial'); updateUI(); }
+function resetProgress(){ lsDel('ncb_tutorial'); updateUI(); }
 
 initLang();
 </script>
