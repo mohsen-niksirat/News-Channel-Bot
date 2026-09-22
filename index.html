@@ -56,13 +56,11 @@ html[lang="en"] [data-lang="fa"]{display:none!important}
 /* ---------- Steps ---------- */
 .step{position:relative;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:30px 30px 26px;margin-bottom:30px;scroll-margin-top:80px}
 .step::before{
-  counter-increment:step; content:counter(step);
   position:absolute;top:-22px;inset-inline-start:24px;width:46px;height:46px;border-radius:14px;
   background:linear-gradient(135deg,var(--accent),var(--accent2));
   display:flex;align-items:center;justify-content:center;
   font-weight:900;font-size:1.25rem;color:#fff;box-shadow:0 6px 18px rgba(46,120,255,.35);
 }
-.steps{counter-reset:step}
 .step h2{font-size:1.25rem;margin:4px 0 4px;padding-inline-start:56px}
 .step .time{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:3px 12px;margin:0 56px 16px 0;margin-inline-start:56px}
 .step p{color:#c6d4ee;margin-bottom:10px}
@@ -163,7 +161,7 @@ footer .links{margin-bottom:10px}
   </div>
 </header>
 
-<div class="wrap">
+<div class="wrap steps">
 
   <!-- ============ PROGRESS ============ -->
   <div class="progress-box">
@@ -621,6 +619,7 @@ function setLang(lang){
   lsSet('ncb_lang', lang);
   document.querySelectorAll('.lang-switch button').forEach(b =>
     b.classList.toggle('on', b.dataset.setlang === lang));
+  renderStepNums();
   updateUI();
 }
 
@@ -672,6 +671,29 @@ boxes.forEach(b => b.addEventListener('change', () => {
 }));
 
 function resetProgress(){ lsDel('ncb_tutorial'); updateUI(); }
+
+/* ---------- explicit step numbers (bulletproof vs CSS counters) ---------- */
+
+function renderStepNums(){
+  const lang = document.documentElement.lang || 'fa';
+  document.querySelectorAll('.step-num').forEach(b => {
+    b.textContent = lang === 'fa' ? faDigits(b.dataset.n) : b.dataset.n;
+  });
+}
+
+(function buildStepBadges(){
+  let n = 0;
+  document.querySelectorAll('.step').forEach(el => {
+    const b = el.querySelector('input[data-step]');
+    if(!b) return;                             // final card: no number
+    n++;
+    const badge = document.createElement('div');
+    badge.className = 'step-num';
+    badge.dataset.n = String(n);
+    badge.style.cssText = 'position:absolute;top:-22px;inset-inline-start:24px;width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.25rem;color:#fff;box-shadow:0 6px 18px rgba(46,120,255,.35)';
+    el.appendChild(badge);
+  });
+})();
 
 initLang();
 </script>
