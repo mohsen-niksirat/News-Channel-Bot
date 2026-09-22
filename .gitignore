@@ -1,0 +1,32 @@
+# ==== SECRETS — never commit ====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ==== Local archives / build artifacts ====
+*.zip
+*.tar.gz
+*.7z
+dist/
+build/
+
+# ==== Python ====
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# ==== Editor / OS ====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ==== Tooling ====
+.freebuff/

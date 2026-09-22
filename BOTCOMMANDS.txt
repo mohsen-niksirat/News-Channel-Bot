@@ -1,0 +1,34 @@
+start - Start and main menu
+help - Help and commands list
+channel - Connect news channel
+discussion - Connect comment group
+cleanup - Delete old handled rows now
+auto - Auto publish on or off
+scan - Scan news sources now
+review - Review pending drafts
+published - Published posts and delete
+sources - List RSS sources
+addsource - Add RSS source
+togglesource - Toggle a source
+fixsources - Fix broken feed URLs
+sourcescheck - Test all feeds
+rescan - Retry failed drafts
+sites - List all sources (RSS + social)
+addsite - Add RSS or social media source
+removesite - Remove a source
+togglesite - Enable/disable a source
+filter - Manage news filters
+ai - Choose AI provider
+model - Choose AI model
+testai - Test Persian AI
+aicheck - Test all AI providers
+balance - Remaining credits per provider
+keys - List AI keys and health
+addkey - Add an AI key
+delkey - Remove an AI key
+footer - Channel footer text
+digest - Periodic round-up post
+settings - Bot settings
+bot - Enable/disable bot scanning (admin only)
+adminstats - Admin stats
+cancel - Cancel bind

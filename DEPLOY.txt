@@ -1,0 +1,36 @@
+NewsChannelBot v1.6
+Upload: main.py + requirements.txt only
+Entry: python main.py
+SQL: 01 -> 02 -> 03 -> 04 -> 05 -> 06 -> 07
+
+REQUIRED env (use Dahl; DeepSeek 402 has no balance):
+  BOT_TOKEN=
+  SUPABASE_URL=
+  SUPABASE_KEY=
+  DAHL_API_KEY=
+  DAHL_BASE_URL=https://inference.dahl.global/v1
+  DAHL_MODEL=deepseek-ai/DeepSeek-V4-Flash-0731
+  AI_PROVIDER=dahl
+  SKIP_EN_WHEN_AI_FAILS=true
+  AI_FAIL_NOTIFY=true
+  SCAN_INTERVAL_SEC=60
+  MAX_ITEMS_PER_SCAN=12
+  MAX_NEW_PER_SOURCE=2
+  DEFAULT_CHANNEL_FOOTER=
+  BOT_ACTIVE=true           # set false to pause all scanning/publishing
+
+Optional DeepSeek if you recharge:
+  DEEPSEEK_API_KEY=
+  DEEPSEEK_BASE_URL=https://api.deepseek.com
+  DEEPSEEK_MODEL=deepseek-chat
+
+Bot:
+  /aicheck  - test ALL models, auto-pick working one, mark broken with X
+  /testai   - test current model
+  AI failure -> private alert to owner; English posts skipped (FA only)
+  /bot on|off|status - enable/disable scanning (admin only)
+  /sites    - list all RSS + social sources
+  /addsite  - add RSS or social media source (twitter, instagram, etc.)
+  /removesite <id>  - remove a source
+  /togglesite <id> - enable/disable a source
+  /filter list|add|del|on|off - manage news filters (block keywords, categories, sources)
