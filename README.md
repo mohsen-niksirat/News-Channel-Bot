@@ -32,6 +32,8 @@ A multi-user **Telegram bot** that turns RSS feeds into ready-to-publish **news 
 
 ### 🚀 راه‌اندازی سریع
 
+> 🎓 **آموزش گرافیکی گام‌به‌گام:** [آموزش پیاده‌سازی](https://mohsen-niksirat.github.io/News-Channel-Bot/) — با چک‌لیست تعاملی و شبیه‌ساز گفتگو
+
 **پیش‌نیازها:** Python 3.10+، یک پروژه [Supabase](https://supabase.com) رایگان، یک AI Provider (فقط یکی کافی است)
 
 **۱) ساخت بات در تلگرام:**
@@ -138,6 +140,8 @@ A multi-user **Telegram channel-admin bot** for news. It monitors international 
 - Always-on background scanner + retention cleanup
 
 ### 🚀 Quick start
+
+> 🎓 **Graphical step-by-step tutorial (Persian):** [Setup Guide](https://mohsen-niksirat.github.io/News-Channel-Bot/) — interactive checklist & chat simulator
 
 **Prerequisites:** Python 3.10+, a free [Supabase](https://supabase.com) project, one AI provider key.
 
