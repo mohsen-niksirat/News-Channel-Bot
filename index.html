@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NewsChannelBot — آموزش پیاده‌سازی گام‌به‌گام</title>
-<meta name="description" content="آموزش گرافیکی مرحله‌به‌مرحله راه‌اندازی NewsChannelBot: ساخت بات تلگرام، دیتابیس Supabase، کلید هوش مصنوعی و انتشار اولین پست خبری.">
+<meta name="description" content="آموزش گرافیکی مرحله‌به‌مرحله راه‌اندازی NewsChannelBot: ساخت بات تلگرام، دیتابیس Supabase، کلید هوش مصنوعی و استقرار روی Deployka — با یا بدون کدنویسی.">
 <style>
 :root{
   --bg:#0b1220; --bg2:#0f1a30; --card:#141f38; --card2:#182544;
@@ -24,17 +24,24 @@ body{
 }
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
-code,pre{font-family:'Cascadia Code',Consolas,Menlo,monospace;direction:ltr;text-align:left}
+code,pre{font-family:'Cascadia Code',Consolas,Menlo,monospace;direction:ltr;text-align:left;unicode-bidi:embed}
 code{background:#0d1830;border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:.86em;color:#9fd0ff}
 pre{background:#0a1428;border:1px solid var(--border);border-radius:12px;padding:16px 18px;overflow-x:auto;font-size:.85rem;line-height:1.7;margin:12px 0;position:relative}
 pre .c{color:#5b7396}  /* comment */
 .wrap{max-width:980px;margin:0 auto;padding:24px 20px 90px}
 
+/* ---------- language switch ---------- */
+html[lang="fa"] [data-lang="en"]{display:none!important}
+html[lang="en"] [data-lang="fa"]{display:none!important}
+.lang-switch{position:fixed;top:14px;inset-inline-end:14px;z-index:100;display:flex;background:rgba(20,31,56,.92);border:1px solid var(--border);border-radius:10px;overflow:hidden;backdrop-filter:blur(8px)}
+.lang-switch button{background:none;border:none;color:var(--muted);padding:7px 16px;cursor:pointer;font-family:inherit;font-size:.82rem;font-weight:700;transition:.2s}
+.lang-switch button.on{background:var(--accent);color:#fff}
+
 /* ---------- Hero ---------- */
 .hero{text-align:center;padding:64px 16px 40px}
 .badge-top{display:inline-flex;align-items:center;gap:8px;background:rgba(46,166,255,.12);border:1px solid rgba(46,166,255,.35);color:#9fd0ff;border-radius:999px;padding:5px 16px;font-size:.8rem;margin-bottom:20px}
-.hero h1{font-size:clamp(1.7rem,4.5vw,2.7rem);font-weight:900;background:linear-gradient(90deg,#4db5ff,#a78bff);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:12px}
-.hero p{color:var(--muted);max-width:620px;margin:0 auto 26px}
+.hero h1{font-size:clamp(1.6rem,4.5vw,2.7rem);font-weight:900;background:linear-gradient(90deg,#4db5ff,#a78bff);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:12px}
+.hero p{color:var(--muted);max-width:640px;margin:0 auto 26px}
 .hero-stats{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px 18px;font-size:.83rem;color:var(--muted)}
 .stat b{color:var(--txt)}
@@ -50,17 +57,18 @@ pre .c{color:#5b7396}  /* comment */
 .step{position:relative;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:30px 30px 26px;margin-bottom:30px;scroll-margin-top:80px}
 .step::before{
   counter-increment:step; content:counter(step);
-  position:absolute;top:-22px;right:24px;width:46px;height:46px;border-radius:14px;
+  position:absolute;top:-22px;inset-inline-start:24px;width:46px;height:46px;border-radius:14px;
   background:linear-gradient(135deg,var(--accent),var(--accent2));
   display:flex;align-items:center;justify-content:center;
   font-weight:900;font-size:1.25rem;color:#fff;box-shadow:0 6px 18px rgba(46,120,255,.35);
 }
 .steps{counter-reset:step}
-.step h2{font-size:1.25rem;margin:4px 0 4px;padding-right:56px}
-.step .time{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:3px 12px;margin:0 56px 16px 0}
+.step h2{font-size:1.25rem;margin:4px 0 4px;padding-inline-start:56px}
+.step .time{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:3px 12px;margin:0 56px 16px 0;margin-inline-start:56px}
 .step p{color:#c6d4ee;margin-bottom:10px}
 .step.done{border-color:rgba(46,204,113,.5)}
-.step.done::after{content:'✓';position:absolute;top:14px;left:16px;width:28px;height:28px;border-radius:50%;background:rgba(46,204,113,.15);border:1px solid rgba(46,204,113,.5);color:var(--ok);display:flex;align-items:center;justify-content:center;font-weight:900}
+.step.done::after{content:'✓';position:absolute;top:14px;inset-inline-end:16px;width:28px;height:28px;border-radius:50%;background:rgba(46,204,113,.15);border:1px solid rgba(46,204,113,.5);color:var(--ok);display:flex;align-items:center;justify-content:center;font-weight:900}
+.steplist{padding-inline-start:20px;color:#c6d4ee;font-size:.92rem}
 
 /* checklist */
 .check{display:flex;gap:10px;align-items:flex-start;background:rgba(46,204,113,.06);border:1px dashed rgba(46,204,113,.4);border-radius:12px;padding:12px 14px;margin-top:16px;cursor:pointer;transition:.2s}
@@ -77,12 +85,19 @@ pre .c{color:#5b7396}  /* comment */
 .tip b,.warn b{display:block;margin-bottom:2px}
 .tip{color:#a8cff2}.warn{color:#f0d9a6}
 
+/* agents callout */
+.agents{background:linear-gradient(135deg,rgba(124,92,255,.12),rgba(46,166,255,.08));border:1px solid rgba(124,92,255,.45);border-radius:16px;padding:20px 24px;margin-bottom:30px}
+.agents h3{font-size:1.05rem;margin-bottom:8px}
+.agents p{font-size:.88rem;color:#c6d4ee;margin-bottom:8px}
+.agent-chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 10px}
+.chip{background:rgba(46,166,255,.12);border:1px solid rgba(46,166,255,.35);color:#9fd0ff;border-radius:999px;padding:4px 14px;font-size:.8rem;font-weight:700}
+
 /* mock screens */
-.mock{background:#0a1428;border:1px solid var(--border);border-radius:16px;padding:18px;margin:16px 0;direction:rtl}
+.mock{background:#0a1428;border:1px solid var(--border);border-radius:16px;padding:18px;margin:16px 0}
 .mock .title{font-size:.78rem;color:var(--muted);text-align:center;margin-bottom:14px;letter-spacing:.5px}
 .tg-window{background:#17212b;border-radius:14px;padding:14px;max-width:420px;margin:0 auto}
-.tg-msg{background:var(--tg);color:#fff;border-radius:14px 14px 4px 14px;padding:10px 14px;font-size:.85rem;max-width:85%;margin-bottom:10px;margin-right:auto}
-.tg-msg.me{background:#2b5278;border-radius:14px 14px 14px 4px;margin-right:0;margin-left:auto}
+.tg-msg{background:var(--tg);color:#fff;border-radius:14px;padding:10px 14px;font-size:.85rem;max-width:85%;margin-bottom:10px;margin-inline-end:auto}
+.tg-msg.me{background:#2b5278;margin-inline-start:auto}
 .tg-btns{display:flex;flex-direction:column;gap:6px;max-width:85%;margin:12px auto 0}
 .tg-btn{background:#1d2a38;border:1px solid #2e4258;color:#c9dcf5;border-radius:10px;padding:8px;text-align:center;font-size:.82rem}
 .db-window{background:#101828;border-radius:14px;overflow:hidden;max-width:520px;margin:0 auto;font-size:.8rem;direction:ltr;text-align:left}
@@ -96,7 +111,7 @@ pre .c{color:#5b7396}  /* comment */
 .opt{background:var(--card2);border:1px solid var(--border);border-radius:14px;padding:16px}
 .opt h4{font-size:.95rem;margin-bottom:6px;display:flex;align-items:center;gap:8px}
 .opt p{font-size:.8rem;color:var(--muted);margin:0}
-.opt .rec{font-size:.68rem;background:rgba(46,204,113,.15);color:var(--ok);border-radius:99px;padding:2px 10px;margin-right:auto}
+.opt .rec{font-size:.68rem;background:rgba(46,204,113,.15);color:var(--ok);border-radius:99px;padding:2px 10px;margin-inline-start:auto}
 
 /* flow diagram */
 .flow{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:18px 0}
@@ -107,7 +122,7 @@ pre .c{color:#5b7396}  /* comment */
 /* steps nav */
 .toc{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px 26px;margin-bottom:40px}
 .toc h3{font-size:1rem;margin-bottom:12px;color:#c6d4ee}
-.toc ol{padding-right:20px;color:var(--muted);font-size:.9rem}
+.toc ol{padding-inline-start:20px;color:var(--muted);font-size:.9rem}
 .toc a{color:#c6d4ee}
 .toc a:hover{color:var(--accent)}
 
@@ -116,25 +131,35 @@ footer .links{margin-bottom:10px}
 
 @media(max-width:640px){
   .step{padding:24px 18px}
-  .step h2{padding-right:48px;font-size:1.05rem}
-  .step .time{margin-right:48px}
+  .step h2{padding-inline-start:48px;font-size:1.05rem}
+  .step .time{margin-inline-start:48px}
   pre{font-size:.75rem}
+  .lang-switch{top:8px;inset-inline-end:8px}
 }
-@media print{ .progress-box{display:none} body{background:#fff;color:#000} }
+@media print{ .progress-box,.lang-switch{display:none} body{background:#fff;color:#000} }
 </style>
 </head>
 <body>
 
+<!-- ============ LANG SWITCH ============ -->
+<div class="lang-switch" role="group" aria-label="Language">
+  <button type="button" data-lang="fa" class="on" onclick="setLang('fa')">فارسی</button>
+  <button type="button" data-lang="en" onclick="setLang('en')">English</button>
+</div>
+
 <!-- ============ HERO ============ -->
 <header class="hero">
-  <div class="badge-top">📰 NewsChannelBot · راهنمای نصب و فعال‌سازی</div>
-  <h1>راهنمای گام‌به‌گام پیاده‌سازی بات خبری تلگرام</h1>
-  <p>از صفر تا انتشار اولین پست خبری در کانال شما — ساخت بات در BotFather، دیتابیس Supabase، کلید هوش مصنوعی و اجرای نهایی. هر مرحله را که تمام کردید، تیک بزنید؛ پیشرفت شما ذخیره می‌شود.</p>
+  <div class="badge-top">📰 NewsChannelBot · <span data-lang="fa">راهنمای نصب و فعال‌سازی</span><span data-lang="en">Setup & Activation Guide</span></div>
+  <h1><span data-lang="fa">راهنمای گام‌به‌گام پیاده‌سازی بات خبری تلگرام</span><span data-lang="en">Step-by-Step Guide: Telegram News Bot Setup</span></h1>
+  <p>
+    <span data-lang="fa">از صفر تا انتشار اولین پست خبری در کانال شما — ساخت بات در BotFather، دیتابیس Supabase، کلید هوش مصنوعی و استقرار دائمی روی Deployka. هر مرحله را که تمام کردید، تیک بزنید؛ پیشرفت شما ذخیره می‌شود.</span>
+    <span data-lang="en">From zero to your channel's first published post — create the bot on BotFather, set up the Supabase database, add an AI key, and deploy permanently on Deployka. Check off each step as you go; your progress is saved.</span>
+  </p>
   <div class="hero-stats">
-    <div class="stat">⏱ زمان کل: <b>~۳۰ دقیقه</b></div>
-    <div class="stat">🧩 مراحل: <b>۷</b></div>
-    <div class="stat">💵 هزینه: <b>رایگان تا ~۵$ در ماه</b></div>
-    <div class="stat">💻 سطح: <b>مقدماتی</b></div>
+    <div class="stat">⏱ <span data-lang="fa">زمان کل:</span><span data-lang="en">Total time:</span> <b>~30 min</b></div>
+    <div class="stat">🧩 <span data-lang="fa">مراحل:</span><span data-lang="en">Steps:</span> <b>7</b></div>
+    <div class="stat">💵 <span data-lang="fa">هزینه:</span><span data-lang="en">Cost:</span> <b><span data-lang="fa">رایگان تا ~۵$/ماه</span><span data-lang="en">free → ~$5/mo</span></b></div>
+    <div class="stat">💻 <span data-lang="fa">سطح:</span><span data-lang="en">Level:</span> <b><span data-lang="fa">مقدماتی</span><span data-lang="en">beginner</span></b></div>
   </div>
 </header>
 
@@ -143,23 +168,40 @@ footer .links{margin-bottom:10px}
   <!-- ============ PROGRESS ============ -->
   <div class="progress-box">
     <div class="progress-bar">
-      <span class="progress-label" id="plabel">۰ از ۷ مرحله</span>
+      <span class="progress-label" id="plabel"></span>
       <div class="progress-track"><div class="progress-fill" id="pfill"></div></div>
-      <button onclick="resetProgress()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:3px 10px;font-size:.72rem;cursor:pointer;font-family:inherit">شروع مجدد</button>
+      <button onclick="resetProgress()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:3px 10px;font-size:.72rem;cursor:pointer;font-family:inherit"><span data-lang="fa">شروع مجدد</span><span data-lang="en">Reset</span></button>
     </div>
+  </div>
+
+  <!-- ============ AI AGENTS (NO-CODE PATH) ============ -->
+  <div class="agents">
+    <h3>🤖 <span data-lang="fa">مسیر بدون کدنویسی — کاری به CMD و ترمینال نداشته باشید</span><span data-lang="en">The no-code path — skip the terminal entirely</span></h3>
+    <p data-lang="fa">نمی‌خواهید خودتان دستور تایپ کنید؟ کافیست در <b>Supabase</b> و <b>Deployka</b> ثبت‌نام کنید (مرحله ۲ و ۷) و آدرس همین ریپو را به یک ایجنت هوش مصنوعی بدهید — بقیه کارها (کلون، نصب، ساخت فایل تنظیمات، رفع خطا) را ایجنت برایتان انجام می‌دهد و فقط می‌گوید چه چیزی را کجا وارد کنید:</p>
+    <p data-lang="en">Don't want to type commands yourself? Just sign up on <b>Supabase</b> and <b>Deployka</b> (steps 2 &amp; 7) and hand this repo's URL to an AI coding agent — it will clone, install, configure and debug everything for you, only asking you for the values to paste:</p>
+    <div class="agent-chips">
+      <span class="chip">🟣 Freebuff</span>
+      <span class="chip">🔷 OpenCode</span>
+      <span class="chip">🔶 Xiaomi MiMo AI</span>
+      <span class="chip">✨ هر AI Agent دیگر</span>
+    </div>
+    <p style="font-size:.8rem;color:var(--muted)">
+      <span data-lang="fa">💡 نمونه دستور آماده برای ایجنت: «این ریپو را کلون کن و برای اجرای NewsChannelBot آماده‌اش کن؛ من مقادیر BOT_TOKEN و SUPABASE_URL و SUPABASE_KEY و AI_KEYS را می‌دهم، تو .env را بساز، وابستگی‌ها را نصب کن و بات را اجرا کن.»</span>
+      <span data-lang="en">💡 Sample prompt for your agent: "Clone this repo and prepare NewsChannelBot to run; I'll provide BOT_TOKEN, SUPABASE_URL, SUPABASE_KEY and AI_KEYS — you create .env, install dependencies and start the bot."</span>
+    </p>
   </div>
 
   <!-- ============ TOC ============ -->
   <nav class="toc">
-    <h3>🗺 فهرست مراحل</h3>
+    <h3>🗺 <span data-lang="fa">فهرست مراحل</span><span data-lang="en">Steps overview</span></h3>
     <ol>
-      <li><a href="#s1">ساخت بات در تلگرام (BotFather)</a></li>
-      <li><a href="#s2">ساخت دیتابیس در Supabase</a></li>
-      <li><a href="#s3">اجرای جداول SQL</a></li>
-      <li><a href="#s4">گرفتن کلید هوش مصنوعی</a></li>
-      <li><a href="#s5">نصب و اجرای بات</a></li>
-      <li><a href="#s6">اتصال کانال و انتشار اولین پست</a></li>
-      <li><a href="#s7">استقرار دائمی (VPS / Docker / Railway)</a></li>
+      <li><a href="#s1"><span data-lang="fa">ساخت بات در تلگرام (BotFather)</span><span data-lang="en">Create the bot on Telegram (BotFather)</span></a></li>
+      <li><a href="#s2"><span data-lang="fa">ساخت دیتابیس در Supabase</span><span data-lang="en">Create the database on Supabase</span></a></li>
+      <li><a href="#s3"><span data-lang="fa">اجرای جداول SQL</span><span data-lang="en">Run the SQL migrations</span></a></li>
+      <li><a href="#s4"><span data-lang="fa">گرفتن کلید هوش مصنوعی</span><span data-lang="en">Get an AI key</span></a></li>
+      <li><a href="#s5"><span data-lang="fa">نصب و اجرای بات</span><span data-lang="en">Install & run the bot</span></a></li>
+      <li><a href="#s6"><span data-lang="fa">اتصال کانال و انتشار اولین پست</span><span data-lang="en">Connect a channel & publish the first post</span></a></li>
+      <li><a href="#s7"><span data-lang="fa">استقرار دائمی (Deployka / VPS / Docker)</span><span data-lang="en">Permanent deployment (Deployka / VPS / Docker)</span></a></li>
     </ol>
   </nav>
 
@@ -167,91 +209,135 @@ footer .links{margin-bottom:10px}
   <div class="flow">
     <div class="node">🤖 BotFather</div><div class="arr">←</div>
     <div class="node">🗄 Supabase</div><div class="arr">←</div>
-    <div class="node">🧠 کلید AI</div><div class="arr">←</div>
-    <div class="node">🐍 اجرای بات</div><div class="arr">←</div>
-    <div class="node hl">📡 کانال شما</div>
+    <div class="node">🧠 AI</div><div class="arr">←</div>
+    <div class="node">🚀 Deployka</div><div class="arr">←</div>
+    <div class="node hl">📡 <span data-lang="fa">کانال شما</span><span data-lang="en">Your channel</span></div>
   </div>
 
   <!-- ============ STEP 1 ============ -->
   <section class="step" id="s1">
-    <h2>ساخت بات در تلگرام (BotFather)</h2>
-    <span class="time">⏱ ۵ دقیقه</span>
-    <p>بات‌های تلگرام همه از طریق ربات رسمی <b>B BotFather</b> ساخته می‌شوند:</p>
-    <ol style="padding-right:20px;color:#c6d4ee;font-size:.92rem">
+    <h2><span data-lang="fa">ساخت بات در تلگرام (BotFather)</span><span data-lang="en">Create the bot on Telegram (BotFather)</span></h2>
+    <span class="time">⏱ <span data-lang="fa">۵ دقیقه</span><span data-lang="en">5 min</span></span>
+    <p>
+      <span data-lang="fa">بات‌های تلگرام همه از طریق ربات رسمی <b>BotFather</b> ساخته می‌شوند:</span>
+      <span data-lang="en">All Telegram bots are created through the official <b>BotFather</b> bot:</span>
+    </p>
+    <ol class="steplist" data-lang="fa">
       <li>در تلگرام به <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> پیام بدهید</li>
       <li>دستور <code>/newbot</code> را بفرستید</li>
       <li>یک <b>نام نمایشی</b> برای بات انتخاب کنید (مثلاً «بات خبر من»)</li>
       <li>یک <b>یوزرنیم یکتا</b> انتخاب کنید که حتماً به <code>bot</code> ختم شود (مثلاً <code>my_news_helper_bot</code>)</li>
     </ol>
+    <ol class="steplist" data-lang="en">
+      <li>Message <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> on Telegram</li>
+      <li>Send the <code>/newbot</code> command</li>
+      <li>Pick a <b>display name</b> (e.g. "My News Bot")</li>
+      <li>Pick a unique <b>username</b> that must end in <code>bot</code> (e.g. <code>my_news_helper_bot</code>)</li>
+    </ol>
 
     <div class="mock">
-      <div class="title">شبیه‌ساز گفتگو</div>
+      <div class="title"><span data-lang="fa">شبیه‌ساز گفتگو</span><span data-lang="en">Chat simulator</span></div>
       <div class="tg-window">
         <div class="tg-msg me">/newbot</div>
         <div class="tg-msg">Alright, a new bot. How are we going to call it? Please send me the name.</div>
-        <div class="tg-msg me">بات خبر من</div>
+        <div class="tg-msg me"><span data-lang="fa">بات خبر من</span><span data-lang="en">My News Bot</span></div>
         <div class="tg-msg">Good. Now let's choose a username (must end in 'bot').</div>
         <div class="tg-msg me">my_news_helper_bot</div>
-        <div class="tg-msg" style="background:#1d3a2c">Done! Use this token: <code style="background:#0e2417;color:#7ee2a8">7216…:AAF…</code><br>⚠️ توکن را کپی و در جای امن نگه دارید</div>
+        <div class="tg-msg" style="background:#1d3a2c">Done! Use this token: <code style="background:#0e2417;color:#7ee2a8">7216…:AAF…</code><br>⚠️ <span data-lang="fa">توکن را کپی و در جای امن نگه دارید</span><span data-lang="en">Copy the token and keep it safe</span></div>
       </div>
     </div>
 
-    <div class="warn"><span class="i">⚠️</span><div><b>توکن = کلید بات شما</b>هر کسی توکن را داشته باشد کنترل بات را دارد. آن را در گیت، اسکرین‌شات یا جایی عمومی منتشر نکنید. اگر لو رفت: BotFather → <code>/revoke</code></div></div>
+    <div class="warn"><span class="i">⚠️</span><div>
+      <b><span data-lang="fa">توکن = کلید بات شما</span><span data-lang="en">The token = your bot's key</span></b>
+      <span data-lang="fa">هر کسی توکن را داشته باشد کنترل بات را دارد. آن را در گیت، اسکرین‌شات یا جایی عمومی منتشر نکنید. اگر لو رفت: BotFather → <code>/revoke</code></span>
+      <span data-lang="en">Anyone with the token controls your bot. Never publish it in git, screenshots or public places. If it leaks: BotFather → <code>/revoke</code></span>
+    </div></div>
 
-    <div class="tip"><span class="i">💡</span><div><b>اختیاری ولی پیشنهادی:</b> دستورات بات را با <code>/setcommands</code> ثبت کنید. محتوای آماده در فایل <code>BOTCOMMANDS.txt</code> ریپو هست — کافیست محتوایش را برای BotFather بفرستید تا منوی دستورات کاربران فعال شود.</div></div>
+    <div class="tip"><span class="i">💡</span><div>
+      <b><span data-lang="fa">اختیاری ولی پیشنهادی</span><span data-lang="en">Optional but recommended</span></b>
+      <span data-lang="fa">دستورات بات را با <code>/setcommands</code> ثبت کنید. محتوای آماده در فایل <code>BOTCOMMANDS.txt</code> ریپو هست — کافیست محتوایش را برای BotFather بفرستید تا منوی دستورات کاربران فعال شود.</span>
+      <span data-lang="en">Register the bot commands via <code>/setcommands</code>. A ready-made list lives in <code>BOTCOMMANDS.txt</code> in the repo — just paste it to BotFather to enable the users' command menu.</span>
+    </div></div>
 
-    <label class="check"><input type="checkbox" data-step="1"><span>بات ساخته شد و توکن را دارم<span class="t">توکن شبیه 123456789:AAF3x… است</span></span></label>
+    <label class="check"><input type="checkbox" data-step="1">
+      <span data-lang="fa">بات ساخته شد و توکن را دارم<span class="t">توکن شبیه 123456789:AAF3x… است</span></span>
+      <span data-lang="en">Bot created — I have the token<span class="t">It looks like 123456789:AAF3x…</span></span>
+    </label>
   </section>
 
   <!-- ============ STEP 2 ============ -->
   <section class="step" id="s2">
-    <h2>ساخت دیتابیس در Supabase</h2>
-    <span class="time">⏱ ۵ دقیقه</span>
-    <p>بات برای ذخیره کاربران، منابع خبری، مقالات و پیش‌نویس‌ها به یک دیتابیس Postgres نیاز دارد — سرویس رایگان <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a> کافی است:</p>
-    <ol style="padding-right:20px;color:#c6d4ee;font-size:.92rem">
+    <h2><span data-lang="fa">ساخت دیتابیس در Supabase</span><span data-lang="en">Create the database on Supabase</span></h2>
+    <span class="time">⏱ <span data-lang="fa">۵ دقیقه</span><span data-lang="en">5 min</span></span>
+    <p>
+      <span data-lang="fa">بات برای ذخیره کاربران، منابع خبری، مقالات و پیش‌نویس‌ها به یک دیتابیس Postgres نیاز دارد — سرویس رایگان <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a> کافی است:</span>
+      <span data-lang="en">The bot stores users, news sources, articles and drafts in a Postgres database — the free <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a> tier is enough:</span>
+    </p>
+    <ol class="steplist" data-lang="fa">
       <li>به <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> بروید و با گیت‌هاب یا ایمیل ثبت‌نام کنید</li>
       <li><b>New project</b> → نام دلخواه → رمز دیتابیس (لازم نیست جایی یادداشت کنید) → منطقه نزدیک به سرور اجرا (مثلاً Frankfurt)</li>
       <li>بعد از آماده‌شدن پروژه: <b>Project Settings → API</b></li>
       <li>دو مقدار را کپی کنید:
-        <ul style="padding-right:20px;margin-top:6px">
+        <ul style="padding-inline-start:20px;margin-top:6px">
           <li><code>Project URL</code> → همان <code>SUPABASE_URL</code></li>
           <li><code>service_role</code> secret → همان <code>SUPABASE_KEY</code> (دکمه Reveal را بزنید)</li>
         </ul>
       </li>
     </ol>
+    <ol class="steplist" data-lang="en">
+      <li>Go to <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> and sign up with GitHub or email</li>
+      <li><b>New project</b> → pick a name → database password (no need to memorize) → a region close to your bot's server (e.g. Frankfurt)</li>
+      <li>Once ready: <b>Project Settings → API</b></li>
+      <li>Copy two values:
+        <ul style="padding-inline-start:20px;margin-top:6px">
+          <li><code>Project URL</code> → this is your <code>SUPABASE_URL</code></li>
+          <li><code>service_role</code> secret → this is your <code>SUPABASE_KEY</code> (click Reveal)</li>
+        </ul>
+      </li>
+    </ol>
 
     <div class="mock">
-      <div class="title">پنل Supabase — Settings → API</div>
+      <div class="title">Supabase — Settings → API</div>
       <div class="db-window">
         <div class="db-bar">
           <span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span>
           <span style="font-size:.7rem;color:#64748b;margin-left:8px">supabase.com/dashboard</span>
         </div>
         <div class="db-body">
-          <div><span class="k">Project URL</span> &nbsp;→&nbsp; <span class="s">https://xbko…kza.supabase.co</span></div>
+          <div><span class="k">Project URL</span> &nbsp;→&nbsp; <span class="s">https://xxxx.supabase.co</span></div>
           <div style="margin-top:8px"><span class="k">service_role secret</span> &nbsp;→&nbsp; <span class="s">eyJhbGciOiJIUzI1NiIs…</span> <span class="n">[Reveal]</span></div>
-          <div style="margin-top:8px;color:#64748b">anon public → ❌ استفاده نکنید</div>
+          <div style="margin-top:8px;color:#64748b">anon public → ❌ <span data-lang="fa">استفاده نکنید</span><span data-lang="en">do not use</span></div>
         </div>
       </div>
     </div>
 
-    <div class="warn"><span class="i">⚠️</span><div><b>حتماً کلید service_role</b> — نه anon. کلید service_role دسترسی کامل دارد و فقط باید سمت سرور (روی هاست بات) بماند؛ هرگز داخل گیت یا کد سمت کاربر قرار نگیرد.</div></div>
+    <div class="warn"><span class="i">⚠️</span><div>
+      <b><span data-lang="fa">حتماً کلید service_role — نه anon</span><span data-lang="en">Use the service_role key — not anon</span></b>
+      <span data-lang="fa">کلید service_role دسترسی کامل دارد و فقط باید سمت سرور (روی هاست بات) بماند؛ هرگز داخل گیت یا کد سمت کاربر قرار نگیرد.</span>
+      <span data-lang="en">The service_role key has full access and must stay server-side (on the bot host) only; never put it in git or client code.</span>
+    </div></div>
 
-    <label class="check"><input type="checkbox" data-step="2"><span>پروژه Supabase ساخته شد و URL + کلید service_role را دارم</span></label>
+    <label class="check"><input type="checkbox" data-step="2">
+      <span data-lang="fa">پروژه Supabase ساخته شد و URL + کلید service_role را دارم</span>
+      <span data-lang="en">Supabase project created — I have the URL + service_role key</span>
+    </label>
   </section>
 
   <!-- ============ STEP 3 ============ -->
   <section class="step" id="s3">
-    <h2>اجرای جداول SQL</h2>
-    <span class="time">⏱ ۳ دقیقه</span>
-    <p>در پنل Supabase، از منوی چپ <b>SQL Editor → New query</b> را باز کنید و ۱۰ فایل پوشه <code>sql/</code> ریپو را <b>به‌ترتیب</b> اجرا کنید:</p>
+    <h2><span data-lang="fa">اجرای جداول SQL</span><span data-lang="en">Run the SQL migrations</span></h2>
+    <span class="time">⏱ <span data-lang="fa">۳ دقیقه</span><span data-lang="en">3 min</span></span>
+    <p>
+      <span data-lang="fa">در پنل Supabase، از منوی چپ <b>SQL Editor → New query</b> را باز کنید و ۱۰ فایل پوشه <code>sql/</code> ریپو را <b>به‌ترتیب</b> اجرا کنید:</span>
+      <span data-lang="en">In the Supabase dashboard open <b>SQL Editor → New query</b> and run the 10 files from the repo's <code>sql/</code> folder <b>in order</b>:</span>
+    </p>
 
     <div class="mock">
-      <div class="title">ترتیب اجرا در SQL Editor</div>
+      <div class="title"><span data-lang="fa">ترتیب اجرا در SQL Editor</span><span data-lang="en">Execution order in SQL Editor</span></div>
       <div class="db-window">
         <div class="db-bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span style="font-size:.7rem;color:#64748b;margin-left:8px">SQL Editor</span></div>
         <div class="db-body">
-          <div><span class="n">01_init.sql</span> <span class="c">-- جداول اصلی: کاربران، منابع، مقالات، پیش‌نویس‌ها</span></div>
+          <div><span class="n">01_init.sql</span> <span class="c"><span data-lang="fa">-- جداول اصلی: کاربران، منابع، مقالات، پیش‌نویس‌ها</span><span data-lang="en">-- core tables: users, sources, articles, drafts</span></span></div>
           <div><span class="n">02_ai_images_footer.sql</span></div>
           <div><span class="n">03_discussion_fulltext.sql</span></div>
           <div><span class="n">04_digest.sql</span></div>
@@ -265,79 +351,125 @@ footer .links{margin-bottom:10px}
       </div>
     </div>
 
-    <p>فایل‌ها را از <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/tree/main/sql" target="_blank" rel="noopener">پوشه sql در گیت‌هاب</a> باز کنید، محتوایشان را کپی و در SQL Editor پیست کنید و دکمه <b>Run</b> را بزنید — به‌ترتیب، یکی‌یکی.</p>
-    <div class="tip"><span class="i">💡</span><div>اگر بعداً پیام خطای «column does not exist» دیدید، یعنی یکی از فایل‌ها اجرا نشده — همین لیست را دوباره چک کنید.</div></div>
+    <p>
+      <span data-lang="fa">فایل‌ها را از <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/tree/main/sql" target="_blank" rel="noopener">پوشه sql در گیت‌هاب</a> باز کنید، محتوایشان را کپی و در SQL Editor پیست کنید و دکمه <b>Run</b> را بزنید — به‌ترتیب، یکی‌یکی.</span>
+      <span data-lang="en">Open the files from the <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/tree/main/sql" target="_blank" rel="noopener">sql folder on GitHub</a>, paste each one into the SQL Editor and press <b>Run</b> — in order, one by one.</span>
+    </p>
+    <div class="tip"><span class="i">💡</span><div>
+      <span data-lang="fa">اگر بعداً پیام خطای «column does not exist» دیدید، یعنی یکی از فایل‌ها اجرا نشده — همین لیست را دوباره چک کنید.</span>
+      <span data-lang="en">If you later see a "column does not exist" error, one file was skipped — re-check this list.</span>
+    </div></div>
 
-    <label class="check"><input type="checkbox" data-step="3"><span>هر ۱۰ فایل SQL بدون خطا اجرا شد</span></label>
+    <label class="check"><input type="checkbox" data-step="3">
+      <span data-lang="fa">هر ۱۰ فایل SQL بدون خطا اجرا شد</span>
+      <span data-lang="en">All 10 SQL files ran without errors</span>
+    </label>
   </section>
 
   <!-- ============ STEP 4 ============ -->
   <section class="step" id="s4">
-    <h2>گرفتن کلید هوش مصنوعی</h2>
-    <span class="time">⏱ ۵ دقیقه</span>
-    <p>بات برای بازنویسی/ترجمه اخبار به پست فارسی، به یک مدل زبانی با رابط OpenAI-compatible نیاز دارد. فقط <b>یکی</b> از گزینه‌ها کافی است:</p>
+    <h2><span data-lang="fa">گرفتن کلید هوش مصنوعی</span><span data-lang="en">Get an AI key</span></h2>
+    <span class="time">⏱ <span data-lang="fa">۵ دقیقه</span><span data-lang="en">5 min</span></span>
+    <p>
+      <span data-lang="fa">بات برای بازنویسی/ترجمه اخبار به پست فارسی، به یک مدل زبانی با رابط OpenAI-compatible نیاز دارد. فقط <b>یکی</b> از گزینه‌ها کافی است:</span>
+      <span data-lang="en">To rewrite/translate news into Persian posts, the bot needs an OpenAI-compatible LLM provider. Any <b>one</b> of these is enough:</span>
+    </p>
 
     <div class="opt-grid">
-      <div class="opt"><h4>🔵 DeepSeek <span class="rec">پیشنهادی</span></h4><p>ثبت‌نام در platform.deepseek.com → ساخت API Key → شارژ حداقلی. مدل «deepseek-chat» فارسی خوبی می‌نویسد.</p></div>
-      <div class="opt"><h4>🟣 Dahl</h4><p>اگر از سرویس‌های واسط استفاده می‌کنید: <code>AI_KEYS=dahl=…</code> و <code>DAHL_BASE_URL</code> را طبق .env.example تنظیم کنید.</p></div>
-      <div class="opt"><h4>⚙️ هر Provider سازگار</h4><p>XKIRO، Inception، Vyce یا هر سرویس OpenAI-compatible دیگر — با زنجیره fallback پشتیبانی می‌شوند.</p></div>
+      <div class="opt"><h4>🔵 DeepSeek <span class="rec"><span data-lang="fa">پیشنهادی</span><span data-lang="en">recommended</span></span></h4><p><span data-lang="fa">ثبت‌نام در platform.deepseek.com → ساخت API Key → شارژ حداقلی. مدل «deepseek-chat» فارسی خوبی می‌نویسد.</span><span data-lang="en">Sign up at platform.deepseek.com → create an API key → minimal top-up. The deepseek-chat model writes good Persian.</span></p></div>
+      <div class="opt"><h4>🟣 Dahl</h4><p><span data-lang="fa">اگر از سرویس‌های واسط استفاده می‌کنید: <code>AI_KEYS=dahl=…</code> و <code>DAHL_BASE_URL</code> را طبق .env.example تنظیم کنید.</span><span data-lang="en">If you use relay services: set <code>AI_KEYS=dahl=…</code> and <code>DAHL_BASE_URL</code> per .env.example.</span></p></div>
+      <div class="opt"><h4>⚙️ <span data-lang="fa">هر Provider سازگار</span><span data-lang="en">Any compatible provider</span></h4><p><span data-lang="fa">XKIRO، Inception، Vyce یا هر سرویس OpenAI-compatible دیگر — با زنجیره fallback پشتیبانی می‌شوند.</span><span data-lang="en">XKIRO, Inception, Vyce or any other OpenAI-compatible service — all supported via the fallback chain.</span></p></div>
     </div>
 
-    <p>کلید را در متغیر <code>AI_KEYS</code> می‌گذارید (چند کلید هم پشتیبانی می‌شود، جداکننده <code>;</code>):</p>
-    <pre><span class="c"># یک کلید:</span>
+    <p>
+      <span data-lang="fa">کلید را در متغیر <code>AI_KEYS</code> می‌گذارید (چند کلید هم پشتیبانی می‌شود، جداکننده <code>;</code>):</span>
+      <span data-lang="en">Put the key in the <code>AI_KEYS</code> variable (multiple keys supported, separated by <code>;</code>):</span>
+    </p>
+    <pre><span class="c"># one key:</span>
 AI_KEYS=deepseek=sk-xxxxxxxx
 
-<span class="c"># چند کلید / چند سرویس (چرخش + fallback):</span>
+<span class="c"># multiple keys / providers (rotation + fallback):</span>
 AI_KEYS=deepseek=sk-aaa;dahl=sk-bbb</pre>
 
-    <div class="tip"><span class="i">💡</span><div>اگر کلید هوش مصنوعی نداشته باشید بات اجرا می‌شود اما به‌جای پست AI، متن خام خبر را می‌فرستد. با دستور <code>/aicheck</code> داخل بات می‌توانید سلامت همه کلیدها را تست کنید.</div></div>
+    <div class="tip"><span class="i">💡</span><div>
+      <span data-lang="fa">اگر کلید هوش مصنوعی نداشته باشید بات اجرا می‌شود اما به‌جای پست AI، متن خام خبر را می‌فرستد. با دستور <code>/aicheck</code> داخل بات می‌توانید سلامت همه کلیدها را تست کنید.</span>
+      <span data-lang="en">Without an AI key the bot still runs but posts raw news text instead of AI-written posts. Use <code>/aicheck</code> inside the bot to test all keys.</span>
+    </div></div>
 
-    <label class="check"><input type="checkbox" data-step="4"><span>کلید AI را دارم (sk-…)</span></label>
+    <label class="check"><input type="checkbox" data-step="4">
+      <span data-lang="fa">کلید AI را دارم (sk-…)</span>
+      <span data-lang="en">I have an AI key (sk-…)</span>
+    </label>
   </section>
 
   <!-- ============ STEP 5 ============ -->
   <section class="step" id="s5">
-    <h2>نصب و اجرای بات</h2>
-    <span class="time">⏱ ۵ دقیقه</span>
-    <p>نیازمندی‌ها: <b>Python 3.10+</b> و <b>git</b>. در ترمینال:</p>
+    <h2><span data-lang="fa">نصب و اجرای بات</span><span data-lang="en">Install & run the bot</span></h2>
+    <span class="time">⏱ <span data-lang="fa">۵ دقیقه</span><span data-lang="en">5 min</span></span>
 
-    <pre><span class="c"># ۱) دانلود پروژه</span>
+    <div class="tip" style="margin-top:0"><span class="i">🤖</span><div>
+      <b><span data-lang="fa">ترمینال ندارید؟ به ایجنت بسپارید!</span><span data-lang="en">No terminal? Hand it to an agent!</span></b>
+      <span data-lang="fa">این مرحله و همه مراحل بعدی فنی را می‌توانید به ایجنت‌های هوشمند (Freebuff، OpenCode، Xiaomi MiMo AI و…) بسپارید: فقط آدرس ریپو و ۴ مقدار کلیدی را بدهید؛ کلون، نصب، ساخت <code>.env</code> و اجرا را خودشان انجام می‌دهند. شما فقط در Supabase و Deployka ثبت‌نام کنید (مرحله ۲ و ۷).</span>
+      <span data-lang="en">You can delegate this and every later technical step to AI agents (Freebuff, OpenCode, Xiaomi MiMo AI, …): just give them the repo URL and the 4 key values; they clone, install, create <code>.env</code> and run everything. You only sign up on Supabase and Deployka (steps 2 &amp; 7).</span>
+    </div></div>
+
+    <p>
+      <span data-lang="fa">نیازمندی‌ها: <b>Python 3.10+</b> و <b>git</b>. در ترمینال:</span>
+      <span data-lang="en">Requirements: <b>Python 3.10+</b> and <b>git</b>. In a terminal:</span>
+    </p>
+
+    <pre><span class="c"># 1) clone the project</span>
 git clone https://github.com/mohsen-niksirat/News-Channel-Bot.git
 cd News-Channel-Bot
 
-<span class="c"># ۲) محیط مجازی + نصب وابستگی‌ها</span>
+<span class="c"># 2) virtual env + dependencies</span>
 python -m venv .venv
-<span class="c"># ویندوز:</span>
+<span class="c"># Windows:</span>
 .venv\Scripts\activate
-<span class="c"># لینوکس/مک:</span>
+<span class="c"># Linux/macOS:</span>
 source .venv/bin/activate
 
 pip install -r requirements.txt
 
-<span class="c"># ۳) ساخت فایل تنظیمات</span>
+<span class="c"># 3) create the config file</span>
 cp .env.example .env</pre>
 
-    <p>فایل <code>.env</code> را باز کنید و ۴ مقدار اجباری را پر کنید:</p>
-    <pre>BOT_TOKEN=<span class="s">توکن BotFather از مرحله ۱</span>
-SUPABASE_URL=<span class="s">آدرس پروژه از مرحله ۲</span>
-SUPABASE_KEY=<span class="s">کلید service_role از مرحله ۲</span>
-AI_KEYS=deepseek=<span class="s">کلید مرحله ۴</span></pre>
+    <p>
+      <span data-lang="fa">فایل <code>.env</code> را باز کنید و ۴ مقدار اجباری را پر کنید:</span>
+      <span data-lang="en">Open <code>.env</code> and fill in the 4 required values:</span>
+    </p>
+    <pre>BOT_TOKEN=<span class="s">BotFather token (step 1)</span>
+SUPABASE_URL=<span class="s">project URL (step 2)</span>
+SUPABASE_KEY=<span class="s">service_role key (step 2)</span>
+AI_KEYS=deepseek=<span class="s">AI key (step 4)</span></pre>
 
-    <div class="warn"><span class="i">⚠️</span><div>فایل <code>.env</code> در <code>.gitignore</code> است و هرگز به گیت پوش نمی‌شود — پس می‌توانید با خیال راحت مقادیر واقعی را داخلش بنویسید.</div></div>
+    <div class="warn"><span class="i">⚠️</span><div>
+      <span data-lang="fa">فایل <code>.env</code> در <code>.gitignore</code> است و هرگز به گیت پوش نمی‌شود — پس می‌توانید با خیال راحت مقادیر واقعی را داخلش بنویسید.</span>
+      <span data-lang="en"><code>.env</code> is in <code>.gitignore</code> and never gets pushed to git — so it's safe to put real values inside it.</span>
+    </div></div>
 
-    <p>اجرای تستی:</p>
+    <p>
+      <span data-lang="fa">اجرای تستی:</span>
+      <span data-lang="en">Test run:</span>
+    </p>
     <pre>python main.py</pre>
-    <p>اگر لاگ اتصال را دیدید، به بات در تلگرام <code>/start</code> بدهید — باید منوی فارسی جواب بدهد. ✋ فعلاً با <code>Ctrl+C</code> متوقفش کنید؛ در مرحله بعد کانال را وصل می‌کنیم.</p>
+    <p>
+      <span data-lang="fa">اگر لاگ اتصال را دیدید، به بات در تلگرام <code>/start</code> بدهید — باید منوی فارسی جواب بدهد. ✋ فعلاً با <code>Ctrl+C</code> متوقفش کنید؛ در مرحله بعد کانال را وصل می‌کنیم.</span>
+      <span data-lang="en">If you see the connection log, send <code>/start</code> to the bot on Telegram — it should reply with the menu. ✋ Stop it with <code>Ctrl+C</code> for now; we'll connect the channel next.</span>
+    </p>
 
-    <label class="check"><input type="checkbox" data-step="5"><span>بات اجرا شد و به /start جواب داد</span></label>
+    <label class="check"><input type="checkbox" data-step="5">
+      <span data-lang="fa">بات اجرا شد و به /start جواب داد</span>
+      <span data-lang="en">Bot runs and answers /start</span>
+    </label>
   </section>
 
   <!-- ============ STEP 6 ============ -->
   <section class="step" id="s6">
-    <h2>اتصال کانال و انتشار اولین پست</h2>
-    <span class="time">⏱ ۵ دقیقه</span>
+    <h2><span data-lang="fa">اتصال کانال و انتشار اولین پست</span><span data-lang="en">Connect a channel & publish the first post</span></h2>
+    <span class="time">⏱ <span data-lang="fa">۵ دقیقه</span><span data-lang="en">5 min</span></span>
 
-    <ol style="padding-right:20px;color:#c6d4ee;font-size:.92rem">
+    <ol class="steplist" data-lang="fa">
       <li>بات را به‌عنوان <b>ادمین کانال</b> اضافه کنید (دسترسی <b>«حذف پیام‌ها»</b> حتماً فعال باشد)</li>
       <li>بات را دوباره اجرا کنید: <code>python main.py</code></li>
       <li>در چت بات: <code>/channel</code> → آیدی کانال را بفرستید: <code>@mychannel</code></li>
@@ -345,39 +477,75 @@ AI_KEYS=deepseek=<span class="s">کلید مرحله ۴</span></pre>
       <li><code>/scan</code> → بات فیدها را می‌خواند و پیش‌نویس می‌سازد</li>
       <li><code>/review</code> → پیش‌نویس‌ها را با دکمه‌ها بررسی کنید</li>
     </ol>
+    <ol class="steplist" data-lang="en">
+      <li>Add the bot as a <b>channel admin</b> (make sure <b>Delete messages</b> permission is on)</li>
+      <li>Run the bot again: <code>python main.py</code></li>
+      <li>In the bot chat: <code>/channel</code> → send your channel: <code>@mychannel</code></li>
+      <li><code>/auto off</code> → start with manual review (recommended)</li>
+      <li><code>/scan</code> → the bot reads feeds and creates drafts</li>
+      <li><code>/review</code> → check drafts with the buttons</li>
+    </ol>
 
     <div class="mock">
-      <div class="title">کارت بررسی پیش‌نویس</div>
+      <div class="title"><span data-lang="fa">کارت بررسی پیش‌نویس</span><span data-lang="en">Draft review card</span></div>
       <div class="tg-window">
-        <div class="tg-msg">📰 <b>افزایش قیمت تراشه‌های حافظه در گزارش جدید</b><br><br>طبق گزارش تازه، عرضه محدود NVMe باعث رشد قیمت‌ها شده است…<br><br>🔗 منبع: BBC Technology</div>
+        <div class="tg-msg">📰 <b><span data-lang="fa">افزایش قیمت تراشه‌های حافظه در گزارش جدید</span><span data-lang="en">Memory chip prices rise, new report says</span></b><br><br><span data-lang="fa">طبق گزارش تازه، عرضه محدود NVMe باعث رشد قیمت‌ها شده است…</span><span data-lang="en">According to a new report, limited NVMe supply is pushing prices up…</span><br><br>🔗 <span data-lang="fa">منبع:</span><span data-lang="en">Source:</span> BBC Technology</div>
         <div class="tg-btns">
-          <div class="tg-btn">✅ انتشار در کانال</div>
-          <div class="tg-btn">🔁 تولید مجدد</div>
-          <div class="tg-btn">❌ رد کردن</div>
+          <div class="tg-btn">✅ <span data-lang="fa">انتشار در کانال</span><span data-lang="en">Publish to channel</span></div>
+          <div class="tg-btn">🔁 <span data-lang="fa">تولید مجدد</span><span data-lang="en">Regenerate</span></div>
+          <div class="tg-btn">❌ <span data-lang="fa">رد کردن</span><span data-lang="en">Reject</span></div>
         </div>
       </div>
     </div>
 
-    <p>بعد از تأیید با ✅، پست با <b>منبع و لینک</b> در کانال منتشر می‌شود. با <code>/published</code> می‌توانید هر پست منتشرشده را 🗑 حذف کنید. وقتی از کیفیت راضی شدید: <code>/auto on</code> تا انتشار خودکار شود.</p>
+    <p>
+      <span data-lang="fa">بعد از تأیید با ✅، پست با <b>منبع و لینک</b> در کانال منتشر می‌شود. با <code>/published</code> می‌توانید هر پست منتشرشده را 🗑 حذف کنید. وقتی از کیفیت راضی شدید: <code>/auto on</code> تا انتشار خودکار شود.</span>
+      <span data-lang="en">After approving with ✅, the post is published with <b>source + link</b>. Use <code>/published</code> to 🗑 delete any published post. Once you're happy with quality: <code>/auto on</code> for automatic publishing.</span>
+    </p>
 
-    <div class="tip"><span class="i">💡</span><div>دستورات مفید بعدی: <code>/sites</code> مدیریت منابع، <code>/filter</code> فیلتر کلمات، <code>/digest</code> پست جمع‌بندی، <code>/settings</code> پنل تنظیمات. لیست کامل: <code>/help</code></div></div>
+    <div class="tip"><span class="i">💡</span><div>
+      <span data-lang="fa">دستورات مفید بعدی: <code>/sites</code> مدیریت منابع، <code>/filter</code> فیلتر کلمات، <code>/digest</code> پست جمع‌بندی، <code>/settings</code> پنل تنظیمات. لیست کامل: <code>/help</code></span>
+      <span data-lang="en">Useful next commands: <code>/sites</code> manage sources, <code>/filter</code> keyword filters, <code>/digest</code> round-up post, <code>/settings</code> settings panel. Full list: <code>/help</code></span>
+    </div></div>
 
-    <label class="check"><input type="checkbox" data-step="6"><span>اولین پست با منبع در کانال منتشر شد 🎉</span></label>
+    <label class="check"><input type="checkbox" data-step="6">
+      <span data-lang="fa">اولین پست با منبع در کانال منتشر شد 🎉</span>
+      <span data-lang="en">First post with source is live in the channel 🎉</span>
+    </label>
   </section>
 
   <!-- ============ STEP 7 ============ -->
   <section class="step" id="s7">
-    <h2>استقرار دائمی (VPS / Docker / Railway)</h2>
-    <span class="time">⏱ ۱۰ دقیقه</span>
-    <p>بات با long polling کار می‌کند — نه پورت می‌خواهد نه دامنه؛ فقط باید پروسه‌اش <b>همیشه روشن</b> باشد. اجرای روی کامپیوتر شخصی دائمی نیست؛ یکی از این سه روش را انتخاب کنید:</p>
+    <h2><span data-lang="fa">استقرار دائمی (Deployka / VPS / Docker)</span><span data-lang="en">Permanent deployment (Deployka / VPS / Docker)</span></h2>
+    <span class="time">⏱ <span data-lang="fa">۱۰ دقیقه</span><span data-lang="en">10 min</span></span>
+    <p>
+      <span data-lang="fa">بات با long polling کار می‌کند — نه پورت می‌خواهد نه دامنه؛ فقط باید پروسه‌اش <b>همیشه روشن</b> باشد. اجرای روی کامپیوتر شخصی دائمی نیست؛ یکی از این روش‌ها را انتخاب کنید:</span>
+      <span data-lang="en">The bot uses long polling — no inbound ports, no domain; the process just has to <b>stay alive</b>. A personal computer isn't always-on; pick one of these:</span>
+    </p>
 
     <div class="opt-grid">
-      <div class="opt"><h4>🖥 VPS + systemd <span class="rec">ارزان‌ترین</span></h4><p>سرور اوبونتو ~۵$ — سرویس systemd با ری‌استارت خودکار. راهنمای کامل: <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/DEPLOY.md" target="_blank" rel="noopener">docs/DEPLOY.md</a></p></div>
-      <div class="opt"><h4>🐳 Docker</h4><p>با فایل‌های آماده در ریپو: <code>docker compose up -d --build</code> و تمام.</p></div>
-      <div class="opt"><h4>🚄 Railway <span class="rec">ساده‌ترین</span></h4><p>بدون سرور: ریپو را وصل کنید، Start Command = <code>python main.py</code>، متغیرها را در تب Variables بگذارید.</p></div>
+      <div class="opt"><h4>🚀 Deployka <span class="rec"><span data-lang="fa">پیشنهادی — همین راهنما با آن تست شده</span><span class="en" data-lang="en">recommended — tested here</span></span></h4>
+        <p><span data-lang="fa"><a href="https://deployka.dev/" target="_blank" rel="noopener">deployka.dev</a> — پنل ساده، بدون سرور. <b>نسخه رایگان ۱۲۸ مگابایت رم</b> می‌دهد که برای این بات کافی است. کافیست سرویس Python بسازید، ریپو را وصل کنید، ۴ متغیر محیطی را وارد کنید و Start Command را <code>python main.py</code> بگذارید.</span>
+        <span data-lang="en"><a href="https://deployka.dev/" target="_blank" rel="noopener">deployka.dev</a> — simple panel, no server. <b>The free tier gives 128 MB of RAM</b>, enough for this bot. Create a Python service, connect the repo, add the 4 env vars, and set Start Command to <code>python main.py</code>.</span></p></div>
+      <div class="opt"><h4>🖥 VPS + systemd <span class="rec"><span data-lang="fa">ارزان‌ترین</span><span data-lang="en">cheapest</span></span></h4>
+        <p><span data-lang="fa">سرور اوبونتو ~۵$ — سرویس systemd با ری‌استارت خودکار. راهنمای کامل:</span><span data-lang="en">Ubuntu VPS ~$5 — systemd service with auto-restart. Full guide:</span> <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/DEPLOY.md" target="_blank" rel="noopener">docs/DEPLOY.md</a></p></div>
+      <div class="opt"><h4>🐳 Docker / Railway</h4>
+        <p><span data-lang="fa">Docker با فایل‌های آماده: <code>docker compose up -d --build</code>. Railway: ریپو را وصل کنید و متغیرها را در تب Variables بگذارید.</span><span data-lang="en">Docker with ready-made files: <code>docker compose up -d --build</code>. Railway: connect the repo and set variables in the Variables tab.</span></p></div>
     </div>
 
-    <p>نمونه سرویس systemd (<code>/etc/systemd/system/newschannelbot.service</code>):</p>
+    <p>
+      <span data-lang="fa">در Deployka فقط این ۴ متغیر را در بخش Environment وارد کنید:</span>
+      <span data-lang="en">On Deployka, enter just these 4 variables in the Environment section:</span>
+    </p>
+    <pre>BOT_TOKEN=<span class="s">(step 1)</span>
+SUPABASE_URL=<span class="s">(step 2)</span>
+SUPABASE_KEY=<span class="s">(step 2)</span>
+AI_KEYS=deepseek=<span class="s">(step 4)</span></pre>
+
+    <p>
+      <span data-lang="fa">نمونه سرویس systemd برای VPS (<code>/etc/systemd/system/newschannelbot.service</code>):</span>
+      <span data-lang="en">Sample systemd service for a VPS (<code>/etc/systemd/system/newschannelbot.service</code>):</span>
+    </p>
     <pre>[Unit]
 Description=NewsChannelBot
 After=network-online.target
@@ -393,38 +561,69 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target</pre>
     <pre>sudo systemctl enable --now newschannelbot
-journalctl -u newschannelbot -f   <span class="c"># لاگ زنده</span></pre>
+journalctl -u newschannelbot -f   <span class="c"># live logs</span></pre>
 
-    <div class="tip"><span class="i">💡</span><div>بعد از استقرار دائمی دیگر نیازی به کامپیوتر روشن نیست — بات ۲۴/۷ فیدها را اسکن و کانال را به‌روز نگه می‌دارد. مانیتورینگ: <code>/adminstats</code> و لاگ‌های سرور.</div></div>
+    <div class="tip"><span class="i">💡</span><div>
+      <span data-lang="fa">بعد از استقرار دائمی دیگر نیازی به کامپیوتر روشن نیست — بات ۲۴/۷ فیدها را اسکن و کانال را به‌روز نگه می‌دارد. مانیتورینگ: <code>/adminstats</code> و لاگ‌های پنل Deployka یا سرور. 🤖 نصب روی Deployka را هم می‌توانید به ایجنت هوش مصنوعی بسپارید.</span>
+      <span data-lang="en">After permanent deployment you don't need your PC on — the bot scans feeds and updates the channel 24/7. Monitoring: <code>/adminstats</code> plus the Deployka panel or server logs. 🤖 You can also delegate the Deployka setup to an AI agent.</span>
+    </div></div>
 
-    <label class="check"><input type="checkbox" data-step="7"><span>بات روی سرور دائمی اجرا می‌شود</span></label>
+    <label class="check"><input type="checkbox" data-step="7">
+      <span data-lang="fa">بات روی هاست دائمی (Deployka / VPS) اجرا می‌شود</span>
+      <span data-lang="en">Bot runs on a permanent host (Deployka / VPS)</span>
+    </label>
   </section>
 
   <!-- ============ FINISH ============ -->
   <div class="step" id="done" style="border-color:rgba(46,204,113,.45)">
-    <h2 style="padding-right:56px">🎉 تبریک! بات شما فعال است</h2>
-    <span class="time">⏱ تمام شد</span>
-    <p>از این لحظه هر خبر تازه از منابع شما به پست فارسی تبدیل و (بسته به حالت) در کانال منتشر می‌شود. پیشنهادهای بعدی:</p>
-    <ul style="padding-right:20px;color:#c6d4ee;font-size:.92rem">
-      <li><code>/fixsources</code> — اصلاح فیدهای خراب · <code>/sourcescheck</code> — تست همه فیدها</li>
-      <li><code>/keys</code> و <code>/balance</code> — پایش کلیدهای AI از داخل بات</li>
-      <li>فایل <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/WHERE_TO_CHANGE.md" target="_blank" rel="noopener">docs/WHERE_TO_CHANGE.md</a> — شخصی‌سازی پیام‌ها و رفتار بات</li>
-      <li>فایل <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/DEPLOY.md" target="_blank" rel="noopener">docs/DEPLOY.md</a> — راهنمای کامل استقرار و عیب‌یابی</li>
+    <h2 style="padding-inline-start:56px"><span data-lang="fa">🎉 تبریک! بات شما فعال است</span><span data-lang="en">🎉 Congratulations — your bot is live!</span></h2>
+    <span class="time">⏱ <span data-lang="fa">تمام شد</span><span data-lang="en">done</span></span>
+    <p>
+      <span data-lang="fa">از این لحظه هر خبر تازه از منابع شما به پست فارسی تبدیل و (بسته به حالت) در کانال منتشر می‌شود. پیشنهادهای بعدی:</span>
+      <span data-lang="en">From now on, every fresh item from your sources becomes a Persian post and (depending on mode) is published to the channel. Next suggestions:</span>
+    </p>
+    <ul class="steplist">
+      <li><code>/fixsources</code> — <span data-lang="fa">اصلاح فیدهای خراب</span><span data-lang="en">fix broken feeds</span> · <code>/sourcescheck</code> — <span data-lang="fa">تست همه فیدها</span><span data-lang="en">test all feeds</span></li>
+      <li><code>/keys</code> / <code>/balance</code> — <span data-lang="fa">پایش کلیدهای AI از داخل بات</span><span data-lang="en">monitor AI keys from inside the bot</span></li>
+      <li><a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/WHERE_TO_CHANGE.md" target="_blank" rel="noopener">docs/WHERE_TO_CHANGE.md</a> — <span data-lang="fa">شخصی‌سازی پیام‌ها و رفتار بات</span><span data-lang="en">customizing messages & behavior</span></li>
+      <li><a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/DEPLOY.md" target="_blank" rel="noopener">docs/DEPLOY.md</a> — <span data-lang="fa">راهنمای کامل استقرار و عیب‌یابی</span><span data-lang="en">full deployment & troubleshooting guide</span></li>
     </ul>
-    <label class="check"><input type="checkbox" data-step="7" style="display:none"><span style="border:none"></span></label>
   </div>
 
   <footer>
     <div class="links">
       <a href="https://github.com/mohsen-niksirat/News-Channel-Bot" target="_blank" rel="noopener">GitHub</a> ·
       <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/README.md" target="_blank" rel="noopener">README</a> ·
-      <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/DEPLOY.md" target="_blank" rel="noopener">Deploy Guide</a>
+      <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/DEPLOY.md" target="_blank" rel="noopener">Deploy Guide</a> ·
+      <a href="https://deployka.dev/" target="_blank" rel="noopener">Deployka</a>
     </div>
-    NewsChannelBot · آموزش پیاده‌سازی · MIT License
+    NewsChannelBot · MIT License
   </footer>
 </div>
 
 <script>
+/* ---------- language switching ---------- */
+const TITLES = {
+  fa: 'NewsChannelBot — آموزش پیاده‌سازی گام‌به‌گام',
+  en: 'NewsChannelBot — Step-by-Step Setup Guide'
+};
+
+function setLang(lang){
+  document.documentElement.lang = lang;
+  document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
+  document.title = TITLES[lang];
+  localStorage.setItem('ncb_lang', lang);
+  document.querySelectorAll('.lang-switch button').forEach(b =>
+    b.classList.toggle('on', b.dataset.lang === lang));
+  updateUI();
+}
+
+function initLang(){
+  const saved = localStorage.getItem('ncb_lang');
+  const browser = (navigator.language || 'fa').toLowerCase().startsWith('fa') ? 'fa' : 'en';
+  setLang(saved || browser);
+}
+
 /* ---------- progress tracking (localStorage) ---------- */
 const TOTAL = 7;
 const boxes = [...document.querySelectorAll('input[data-step]')];
@@ -437,21 +636,25 @@ const faDigits = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
 
 function updateUI(){
   const state = loadState();
+  const lang = document.documentElement.lang || 'fa';
   boxes.forEach(b => { b.checked = !!state[b.dataset.step]; });
   steps.forEach(s => {
     const b = s.querySelector('input[data-step]');
     s.classList.toggle('done', !!(b && state[b.dataset.step]));
   });
-  const done = Object.values(state).filter(Boolean).length;
+  const done = Object.keys(state).filter(k => state[k]).length;
   document.getElementById('pfill').style.width = (done/TOTAL*100) + '%';
+  const dn = lang==='fa' ? faDigits(done) : done;
+  const tt = lang==='fa' ? faDigits(TOTAL) : TOTAL;
   document.getElementById('plabel').textContent =
-    faDigits(done) + ' از ' + faDigits(TOTAL) + ' مرحله' + (done===TOTAL ? ' — کامل ✅' : '');
+    lang==='fa'
+      ? dn + ' از ' + tt + ' مرحله' + (done===TOTAL ? ' — کامل ✅' : '')
+      : done + ' of ' + TOTAL + ' steps' + (done===TOTAL ? ' — complete ✅' : '');
 }
 
 boxes.forEach(b => b.addEventListener('change', () => {
   const state = loadState();
   if(b.checked){
-    // ticking a step marks it (and lower steps, since order is linear)
     const n = parseInt(b.dataset.step,10);
     for(let i=1;i<=n;i++) state[i] = true;
   } else {
@@ -463,7 +666,7 @@ boxes.forEach(b => b.addEventListener('change', () => {
 
 function resetProgress(){ localStorage.removeItem('ncb_tutorial'); updateUI(); }
 
-updateUI();
+initLang();
 </script>
 </body>
 </html>

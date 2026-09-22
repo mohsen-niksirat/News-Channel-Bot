@@ -78,11 +78,13 @@ python main.py
 
 | پلتفرم | توضیح |
 |---|---|
+| Deployka | [deployka.dev](https://deployka.dev) — پنل ساده، **نسخه رایگان ۱۲۸ مگ رم** (کافی برای این بات)؛ ریپو را وصل کنید + ۴ متغیر محیطی |
 | VPS (اوبونتو + systemd) | سرویس systemd بسازید: `ExecStart=/usr/bin/python3 main.py` |
 | Docker / Railway / Render / Fly.io | فرآیند دائمی با `python main.py` |
-| Deployka | فقط `main.py` + `requirements.txt` + env |
 
-نکته: اسکنر یک ترد پس‌زمینه است — پروسه باید **همیشه روشن** بماند.
+نکته: اسکنر یک ترد پس‌زمینه است — پروسه باید **همیشه روشن** بماند. راهنمای کامل: [docs/DEPLOY.md](docs/DEPLOY.md)
+
+💡 **بدون کدنویسی:** مراحل فنی را می‌توانید به ایجنت‌های هوش مصنوعی (Freebuff، OpenCode، Xiaomi MiMo AI و…) بسپارید — فقط آدرس ریپو و ۴ مقدار کلیدی را به آن‌ها بدهید.
 
 ### 📋 دستورات بات
 فهرست کامل: [`BOTCOMMANDS.txt`](BOTCOMMANDS.txt) — موارد اصلی:
@@ -184,7 +186,9 @@ Only 4 are required; everything else has defaults — see [`.env.example`](.env.
 | `ADMIN_TELEGRAM_IDS` | Telegram ids allowed `/bot`, `/adminstats` |
 
 ### 📡 Deploy
-Any always-on Python host: **VPS (systemd)**, Docker, Railway, Render, Fly.io, Deployka (`main.py` + `requirements.txt` + env vars). The scanner runs in a background thread, so the process must stay alive.
+Any always-on Python host: **Deployka** ([deployka.dev](https://deployka.dev) — simple panel, **free tier with 128 MB RAM**, enough for this bot; connect repo + 4 env vars), **VPS (systemd)**, Docker, Railway, Render, Fly.io. The scanner runs in a background thread, so the process must stay alive. Full guide: [docs/DEPLOY.md](docs/DEPLOY.md)
+
+💡 **No-code option:** delegate the technical steps to AI coding agents (Freebuff, OpenCode, Xiaomi MiMo AI, …) — just give them the repo URL and the 4 key values.
 
 ### 📋 Commands
 Full list: [`BOTCOMMANDS.txt`](BOTCOMMANDS.txt) — highlights:

@@ -4,13 +4,18 @@
 
 This bot is a **long-running Python process** that uses Telegram **long polling**
 (no inbound ports, no reverse proxy, no domain needed). It must simply *stay alive*.
-This guide covers the three most common ways to run it:
+This guide covers the most common ways to run it:
 
 | Platform | Difficulty | Cost | Best for |
 |---|---|---|---|
+| **Deployka** | Easy | **Free tier: 128 MB RAM** | No server management — tested with this bot |
 | **VPS + systemd** (Ubuntu/Debian) | Medium | ~$4–6/mo | Full control, cheapest long-term |
 | **Docker / Docker Compose** | Medium | Any host | Reproducible, easy migrations |
 | **Railway** (PaaS) | Easy | Usage-based | Zero server management |
+
+> 💡 **No-code path:** you can delegate the whole deployment to an AI coding agent
+> (Freebuff, OpenCode, Xiaomi MiMo AI, …): sign up on Supabase + Deployka yourself,
+> give the agent this repo URL plus the 4 key values, and let it do the rest.
 
 > **Before any deploy:** create the bot on [@BotFather](https://t.me/BotFather),
 > create a [Supabase](https://supabase.com) project and run `sql/01_init.sql` …
@@ -266,6 +271,24 @@ docker run -d --name newschannelbot --env-file .env --restart unless-stopped \
 
 Railway runs it as a normal long-running service (no ports needed).
 
+### 3.0) Deployka (recommended, free tier)
+
+The author runs this bot on [deployka.dev](https://deployka.dev/) — its free tier
+provides **128 MB RAM**, enough for this bot (~100–150 MB RSS):
+
+1. Sign up at [deployka.dev](https://deployka.dev/)
+2. Create a new **Python service** and connect this GitHub repo (or upload
+   `main.py`, `sources_defaults.py`, `requirements.txt`)
+3. In **Environment** add the 4 required vars from step 0 above
+   (`BOT_TOKEN`, `SUPABASE_URL`, `SUPABASE_KEY`, `AI_KEYS`)
+4. Start command: `python main.py`
+5. Keep the service **always-on** (the scanner is a background thread)
+6. Watch the service logs — the bot prints its startup banner there
+
+> ⚠️ Too many env vars can exceed Deployka's per-service variable limit —
+> use only the 4 required ones (everything else has code defaults).
+> The bot's `AI_KEYS` compact format exists exactly for this.
+
 ### 3.1 Deploy from GitHub (recommended)
 
 1. Push this repo to your GitHub (or fork it).
@@ -400,12 +423,21 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
-## ۳) Railway
+## ۳) Deployka / Railway (بدون سرور)
 
-1. ریپو را به گیت‌هاب پوش کنید → [railway.app](https://railway.app) → **Deploy from GitHub repo**
-2. Start Command: `python main.py`
-3. در تب **Variables** چهار مقدار `BOT_TOKEN`، `SUPABASE_URL`، `SUPABASE_KEY`، `AI_KEYS` را اضافه کنید
-4. دامنه عمومی لازم نیست؛ سرویس باید همیشه روشن باشد
+**Deployka** (پیشنهادی — نسخه رایگان ۱۲۸ مگ رم دارد، برای این بات کافی است):
+
+1. ثبت‌نام در [deployka.dev](https://deployka.dev/)
+2. سرویس Python جدید → اتصال همین ریپوی گیت‌هاب (یا آپلود `main.py`, `sources_defaults.py`, `requirements.txt`)
+3. در بخش Environment فقط ۴ متغیر اجباری: `BOT_TOKEN`, `SUPABASE_URL`, `SUPABASE_KEY`, `AI_KEYS`
+4. Start Command: `python main.py`
+5. سرویس همیشه روشن باشد؛ لاگ‌ها را از پنل ببینید
+
+💡 کل مراحل فنی را می‌توانید به ایجنت هوش مصنوعی بسپارید (Freebuff، OpenCode، Xiaomi MiMo AI و…):
+شما فقط در Supabase و Deployka ثبت‌نام کنید و آدرس ریپو + ۴ مقدار را به ایجنت بدهید؛
+بقیه کارها (کلون، نصب، ساخت `.env`، رفع خطا) با ایجنت است.
+
+**Railway:** ریپو را وصل کنید → Start Command: `python main.py` → متغیرها در تب Variables.
 
 ## چک‌لیست راه‌اندازی نهایی
 
