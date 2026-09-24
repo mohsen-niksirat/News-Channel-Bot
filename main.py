@@ -2319,22 +2319,24 @@ def publish_hourly_summary(user: dict) -> tuple[bool, str]:
     # Get user's footer
     footer = (user.get("channel_footer") or DEFAULT_CHANNEL_FOOTER or "").strip()
     
-    # Build summary text - no URLs, just titles and short descriptions
+    # Build summary text - just key sentences, no URLs
     lines = ["⏰ 📊 خلاصهٔ پیام‌های محدود شده (حداکثر " + str(limit) + " پیام در ساعت)"]
     lines.append("")
     
     for q in queue[:limit]:
         fa_text = q.get("fa_text") or ""
-        # Extract title and first paragraph as the key sentence
+        # Extract just the title/first line as the key sentence
         if fa_text:
-            parts = fa_text.split("\n\n") if "\n\n" in fa_text else [fa_text]
-            first_paragraph = parts[0].strip() if parts else fa_text[:150]
-            # Clean up HTML tags for the summary
-            clean_text = re.sub(r"<[^>]+>", "", first_paragraph).strip()
+            # Split on newlines and get first non-empty line
+            clean_text = fa_text.strip().split("\n")[0].strip()
+            # Remove HTML tags
+            clean_text = re.sub(r"<[^>]+>", "", clean_text).strip()
+            # Remove the 📢 prefix if present
+            clean_text = clean_text.replace("📢", "").strip()
             if clean_text:
                 lines.append(f"• {clean_text}")
     
-    if lines:
+    if len(lines) > 2:  # If we have items
         lines.append("")
         if footer:
             lines.append(footer)
@@ -2388,6 +2390,9 @@ def publish_hourly_summary(user: dict) -> tuple[bool, str]:
 
 def check_all_hourly_summaries():
     """Check for users who need hourly summaries (their limit was reached)."""
+    # Do not run if bot is inactive
+    if not BOT_ACTIVE:
+        return
     try:
         users = sb_get("bot_users?channel_id=not.is.null&max_posts_per_hour=gt.0&limit=500")
     except Exception as e:
