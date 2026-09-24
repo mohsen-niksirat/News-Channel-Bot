@@ -23,5 +23,5 @@ DEFAULT_SOURCES = [
     {"name": "Khabaronline", "url": "https://www.khabaronline.ir/rss", "lang": "fa", "category": "iran"},
     {"name": "Tabnak", "url": "https://www.tabnak.ir/rss", "lang": "fa", "category": "iran"},
     {"name": "Digiato", "url": "https://digiato.com/feed/", "lang": "fa", "category": "tech"},
-    {"name": "Varzesh3", "url": "https://www.varzesh3.com/rss", "lang": "fa", "category": "sports"},
+    {"name": "Varzesh3", "url": "https://www.varzesh3.com/rss/all", "lang": "fa", "category": "sports"},
 ]

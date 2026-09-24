@@ -28,6 +28,8 @@ addkey - Add an AI key
 delkey - Remove an AI key
 footer - Channel footer text
 digest - Periodic round-up post
+hourlylimit - Set max posts per hour (sends summary when limit reached)
+hourlystatus - Show current hourly quota status
 settings - Bot settings
 bot - Enable/disable bot scanning (admin only)
 adminstats - Admin stats

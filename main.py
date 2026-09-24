@@ -1475,6 +1475,10 @@ def settings_keyboard(user: dict) -> InlineKeyboardMarkup:
     footer_short = (user.get("channel_footer") or DEFAULT_CHANNEL_FOOTER or "—")[:20]
     kb.add(InlineKeyboardButton(f"✍️ فوتر: {footer_short}", callback_data="menu:footer"))
     kb.add(InlineKeyboardButton("💰 موجودی کلیدها", callback_data="menu:balance"))
+    # Hourly limit
+    hourly_limit = get_hourly_limit(user)
+    hourly_display = f"{hourly_limit}/h" if hourly_limit > 0 else "بدون حد"
+    kb.add(InlineKeyboardButton(f"⏰ حد پیام/ساعت: {hourly_display}", callback_data="menu:hourly"))
     if BOT_ACTIVE:
         kb.add(InlineKeyboardButton("✅ ربات فعال", callback_data="set:bot_off"))
     else:
@@ -1787,6 +1791,10 @@ def article_passes_filters(article: dict, filters: list[dict], source_row: dict)
 
 
 def process_user_scan(user_id: int):
+    # FIX: Check BOT_ACTIVE before processing (respects /bot off)
+    if not BOT_ACTIVE:
+        log.debug("Bot inactive — skipping scan for user %s", user_id)
+        return
     user = get_user(user_id)
     if not user or not user.get("channel_id"):
         return
@@ -1843,14 +1851,40 @@ def process_user_scan(user_id: int):
             if not article_passes_filters(article, filters, src):
                 log.debug("article filtered out user=%s source=%s title=%s", user_id, src.get("name"), article.get("title")[:50])
                 continue
+            # FIX: Comprehensive duplicate detection - check if article already processed
             draft = find_draft(user_id, article["id"])
             if draft:
-                # Only terminal/active states block reprocessing.
-                # failed drafts are retried when AI recovers.
+                # Block reprocessing of drafts in terminal states
                 if draft.get("status") in ("published", "pending", "waiting_review", "rejected"):
+                    log.debug("Skipping draft user=%s article_id=%s status=%s", user_id, article.get("id"), draft.get("status"))
                     continue
+                # Also check if just published (within last few seconds)
+                if draft.get("published_at"):
+                    try:
+                        pub_at = draft.get("published_at")
+                        pub_dt = datetime.fromisoformat(str(pub_at).replace("Z", "+00:00"))
+                        if pub_dt.tzinfo is None:
+                            pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                        if (datetime.now(timezone.utc) - pub_dt).total_seconds() < 5:
+                            log.debug("Recently published, skipping: user=%s article_id=%s", user_id, article.get("id"))
+                            continue
+                    except Exception:
+                        pass
 
             src_lang = (article.get("source_lang") or src.get("lang") or "en").lower()
+
+            # FIX: Duplicate message detection - skip if same URL already published
+            # Check if this article URL has already been published for this user
+            try:
+                existing_pub = sb_get(
+                    f"drafts?user_id=eq.{user_id}&article_id=eq.{article['id']}&status=eq.published&limit=1"
+                )
+                if existing_pub:
+                    log.debug("Already published: user=%s article_id=%s url=%s", user_id, article.get("id"), article.get("url", "")[:50])
+                    continue
+            except Exception:
+                pass  # If DB check fails, continue processing
+
             fa, used_ai = ai_persian_post(
                 title=article.get("title") or "",
                 summary=article.get("summary") or "",
@@ -1899,11 +1933,41 @@ def process_user_scan(user_id: int):
             created += 1
             per_source[src_key] = per_source.get(src_key, 0) + 1
 
-            if auto:
+            # Check hourly post limit (applies to both auto and manual mode)
+            hourly_limit = get_hourly_limit(user)
+            current_count = 0
+            if hourly_limit > 0 and BOT_ACTIVE:
+                user_refreshed = get_user(user_id) or user
+                current_count = user_refreshed.get("hourly_posts_count", 0) or 0
+                
+                # Check if we need to reset the counter for a new hour
+                reset_at = user_refreshed.get("hourly_reset_at")
+                if reset_at:
+                    try:
+                        reset_dt = datetime.fromisoformat(str(reset_at).replace("Z", "+00:00"))
+                        if reset_dt.tzinfo is None:
+                            reset_dt = reset_dt.replace(tzinfo=timezone.utc)
+                        if (datetime.now(timezone.utc) - reset_dt).total_seconds() >= 3600:
+                            current_count = 0
+                    except Exception:
+                        current_count = 0
+                
+                if current_count >= hourly_limit:
+                    # Limit reached - queue for hourly summary
+                    log.debug("Hourly limit reached user=%s count=%d limit=%d", user_id, current_count, hourly_limit)
+                    queue_for_hourly(user_id, article["id"], fa or (article.get("title") or "")[:200])
+                    time.sleep(0.15)
+                    continue
+
+            # Check BOT_ACTIVE before auto-publishing
+            if auto and BOT_ACTIVE:
                 t0 = time.time()
                 ok, info = publish_draft(user, draft, fa, article)
                 if ok:
                     published += 1
+                    # Increment hourly count
+                    if hourly_limit > 0:
+                        increment_hourly_count(user_id)
                     # publish FIRST, then comment on the mirrored post
                     discussion_publish(user, draft, full_fa or fa, info, since_ts=t0)
                 else:
@@ -1982,6 +2046,11 @@ def scanner_loop():
             check_all_digests()
         except Exception as e:
             log.error("digest_loop: %s", e)
+        # Check for hourly summaries (when users hit their post limit)
+        try:
+            check_all_hourly_summaries()
+        except Exception as e:
+            log.error("hourly_summary_loop: %s", e)
         try:
             if time.time() - LAST_CLEANUP_TS >= CLEANUP_INTERVAL_SEC:
                 cleanup_old_rows()
@@ -2144,6 +2213,208 @@ def check_all_digests():
                 log.info("digest due user=%s → %s", u.get("telegram_id"), detail)
         except Exception as e:
             log.error("digest user=%s: %s", u.get("telegram_id"), e)
+
+
+# ============================================================
+# Hourly post limit (when reached, queue for hourly summary)
+# ============================================================
+
+def get_hourly_limit(user: dict) -> int:
+    """Get user's max posts per hour (0 = unlimited)."""
+    try:
+        n = int(user.get("max_posts_per_hour") or 0)
+    except Exception:
+        n = 0
+    return n
+
+
+def increment_hourly_count(user_id: int) -> int:
+    """Increment and return current hour count for user. Resets if hour passed."""
+    now = datetime.now(timezone.utc)
+    try:
+        rows = sb_get(f"bot_users?telegram_id=eq.{user_id}&limit=1")
+        if not rows:
+            return 0
+        u = rows[0]
+        reset_at = u.get("hourly_reset_at")
+        count = u.get("hourly_posts_count", 0) or 0
+        
+        # Check if hour has passed
+        if reset_at:
+            try:
+                reset_dt = datetime.fromisoformat(str(reset_at).replace("Z", "+00:00"))
+                if reset_dt.tzinfo is None:
+                    reset_dt = reset_dt.replace(tzinfo=timezone.utc)
+                if (now - reset_dt).total_seconds() >= 3600:
+                    count = 0
+                    reset_at = None
+            except Exception:
+                count = 0
+                reset_at = None
+        
+        # If no reset time, set it
+        if not reset_at:
+            count = 0
+        if not reset_at:
+            sb_patch(
+                f"bot_users?telegram_id=eq.{user_id}",
+                {"hourly_posts_count": 0, "hourly_reset_at": utcnow_iso(), "updated_at": utcnow_iso()},
+            )
+            return 0
+        
+        sb_patch(
+            f"bot_users?telegram_id=eq.{user_id}",
+            {"hourly_posts_count": count + 1, "updated_at": utcnow_iso()},
+        )
+        return count + 1
+    except Exception as e:
+        log.warning("increment_hourly_count: %s", e)
+        return 0
+
+
+def queue_for_hourly(user_id: int, article_id: int, fa_text: str):
+    """Queue an article for hourly summary when limit is reached."""
+    try:
+        sb_post("hourly_queue", [{
+            "user_id": user_id,
+            "article_id": article_id,
+            "fa_text": fa_text[:2000],
+        }])
+        log.info("Queued article %s for hourly summary user=%s", article_id, user_id)
+    except Exception as e:
+        log.warning("queue_for_hourly: %s", e)
+
+
+def get_hourly_queue(user_id: int) -> list:
+    """Get all queued articles for a user."""
+    try:
+        return sb_get(f"hourly_queue?user_id=eq.{user_id}&order=queued_at.asc&limit=50")
+    except Exception as e:
+        log.debug("get_hourly_queue: %s", e)
+        return []
+
+
+def clear_hourly_queue(user_id: int):
+    """Clear the hourly queue for a user."""
+    try:
+        sb_delete(f"hourly_queue?user_id=eq.{user_id}")
+    except Exception as e:
+        log.warning("clear_hourly_queue: %s", e)
+
+
+def publish_hourly_summary(user: dict) -> tuple[bool, str]:
+    """Publish a summary of queued articles for a user."""
+    chat_id = require_channel(user)
+    if not chat_id:
+        return False, "کانال متصل نیست"
+    
+    limit = get_hourly_limit(user)
+    if limit <= 0:
+        return False, "حد ساعتی تنظیم نشده است"
+    
+    queue = get_hourly_queue(user.get("telegram_id"))
+    if not queue:
+        return False, "هیچ پیامی برای جمع‌بندی در بازه ساعتی نبود"
+    
+    # Get user's footer
+    footer = (user.get("channel_footer") or DEFAULT_CHANNEL_FOOTER or "").strip()
+    
+    # Build summary text - no URLs, just titles and short descriptions
+    lines = ["⏰ 📊 خلاصهٔ پیام‌های محدود شده (حداکثر " + str(limit) + " پیام در ساعت)"]
+    lines.append("")
+    
+    for q in queue[:limit]:
+        fa_text = q.get("fa_text") or ""
+        # Extract title and first paragraph as the key sentence
+        if fa_text:
+            parts = fa_text.split("\n\n") if "\n\n" in fa_text else [fa_text]
+            first_paragraph = parts[0].strip() if parts else fa_text[:150]
+            # Clean up HTML tags for the summary
+            clean_text = re.sub(r"<[^>]+>", "", first_paragraph).strip()
+            if clean_text:
+                lines.append(f"• {clean_text}")
+    
+    if lines:
+        lines.append("")
+        if footer:
+            lines.append(footer)
+    
+    text = "\n".join(lines)[:MAX_TG_MESSAGE]
+    
+    try:
+        msg_id = None
+        # Try to send with images if available
+        images = []
+        for q in queue[:limit]:
+            article = find_article_by_id(q.get("article_id"))
+            if article and article.get("images"):
+                img_list = []
+                for img in article.get("images", []):
+                    if isinstance(img, str) and img.startswith("http"):
+                        img_list.append(img)
+                        if len(img_list) >= MAX_POST_IMAGES:
+                            break
+                if img_list:
+                    images = img_list
+                    break
+        
+        if images:
+            caption = text[:1024]
+            media = [InputMediaPhoto(images[0], caption=caption, parse_mode=PARSE_MODE)]
+            for u in images[1:]:
+                media.append(InputMediaPhoto(u))
+            msgs = bot.send_media_group(chat_id, media)
+            if msgs:
+                msg_id = msgs[0].message_id
+        
+        if not msg_id:
+            msg = bot.send_message(chat_id, text, parse_mode=PARSE_MODE, disable_web_page_preview=True)
+            msg_id = msg.message_id
+        
+        # Clear queue after sending
+        clear_hourly_queue(user.get("telegram_id"))
+        
+        # Reset the counter
+        sb_patch(
+            f"bot_users?telegram_id=eq.{user.get('telegram_id')}",
+            {"hourly_posts_count": 0, "hourly_reset_at": utcnow_iso(), "updated_at": utcnow_iso()},
+        )
+        
+        return True, f"خلاصهٔ {min(len(queue), limit)} پیام منتشر شد"
+    except Exception as e:
+        log.error("publish_hourly_summary: %s", e)
+        return False, str(e)[:200]
+
+
+def check_all_hourly_summaries():
+    """Check for users who need hourly summaries (their limit was reached)."""
+    try:
+        users = sb_get("bot_users?channel_id=not.is.null&max_posts_per_hour=gt.0&limit=500")
+    except Exception as e:
+        log.error("check_all_hourly_summaries list: %s", e)
+        return
+    
+    for u in users:
+        try:
+            count = u.get("hourly_posts_count", 0) or 0
+            limit = u.get("max_posts_per_hour") or 0
+            queue = get_hourly_queue(u.get("telegram_id"))
+            
+            if count >= limit and queue:
+                ok, detail = publish_hourly_summary(u)
+                if ok:
+                    log.info("Hourly summary posted user=%s → %s", u.get("telegram_id"), detail)
+        except Exception as e:
+            log.error("hourly summary user=%s: %s", u.get("telegram_id"), e)
+
+
+def find_article_by_id(aid: int) -> dict | None:
+    """Find article by ID."""
+    try:
+        rows = sb_get(f"articles?id=eq.{aid}&limit=1")
+        return rows[0] if rows else None
+    except Exception:
+        return None
 
 
 def cleanup_old_rows(force: bool = False) -> tuple[int, int]:
@@ -3419,6 +3690,89 @@ def _set_digest(user_id: int, enabled: bool | None = None, hours: int | None = N
             pass
 
 
+@bot.message_handler(commands=["hourlylimit", "hourly"])
+def cmd_hourlylimit(message):
+    """Manage max posts per hour. When limit reached, unread articles are queued and sent as summary."""
+    user = upsert_user(message)
+    parts = (message.text or "").split(maxsplit=1)
+    uid = user.get("telegram_id")
+    current_limit = get_hourly_limit(user)
+    
+    if len(parts) < 2:
+        bot.send_message(
+            message.chat.id,
+            f"⏰ حداکثر پیام در ساعت\n\n"
+            f"فعلی: {current_limit if current_limit > 0 else 'دی‌هیچ‌محدودیتی نیست'}\n\n"
+            f"دستورها:\n"
+            f"/hourlylimit <عدد>  — حداکثر پیام در ساعت (مثال: /hourlylimit 2)\n"
+            f"/hourlylimit 0 یا off — غیرفعال کردن حد\n"
+            f"/hourlystatus — نمایش وضعیت فعلی\n\n"
+            f"وقتی حد رسیده شد، پیام‌های جدید در صف قرار می‌گیرند و در انتهای ساعت به صورت یک خلاصه منتشر می‌شوند.",
+        )
+        return
+    
+    arg = parts[1].lower().strip()
+    if arg in ("0", "off", "غیرفعال", "none", "null"):
+        sb_patch(
+            f"bot_users?telegram_id=eq.{uid}",
+            {"max_posts_per_hour": 0, "updated_at": utcnow_iso()},
+        )
+        bot.send_message(message.chat.id, "✅ حداکثر پیام در ساعت غیرفعال شد (بدون حد).")
+        return
+    
+    try:
+        limit = int(arg)
+        if limit < 1 or limit > 100:
+            bot.send_message(message.chat.id, "فرمت: /hourlylimit <عدد بین ۱ تا ۱۰۰>")
+            return
+        sb_patch(
+            f"bot_users?telegram_id=eq.{uid}",
+            {"max_posts_per_hour": limit, "updated_at": utcnow_iso()},
+        )
+        bot.send_message(message.chat.id, f"✅ حداکثر {limit} پیام در ساعت تنظیم شد.\nوقتی رسید، پیام‌های جدید در صف می‌مونن و در انتهای ساعت خلاصه می‌شن.")
+    except ValueError:
+        bot.send_message(message.chat.id, "فرمت: /hourlylimit <عدد> یا /hourlylimit off")
+
+
+@bot.message_handler(commands=["hourlystatus"])
+def cmd_hourlystatus(message):
+    """Show current hourly quota status."""
+    user = upsert_user(message)
+    uid = user.get("telegram_id")
+    try:
+        rows = sb_get(f"bot_users?telegram_id=eq.{uid}&limit=1")
+        if not rows:
+            bot.send_message(message.chat.id, "کاربر یافت نشد.")
+            return
+        u = rows[0]
+        limit = u.get("max_posts_per_hour", 0) or 0
+        count = u.get("hourly_posts_count", 0) or 0
+        next_reset = u.get("hourly_reset_at", "") or ""
+        queue = get_hourly_queue(uid)
+        
+        lines = [
+            "⏰ وضعیت حداکثر پیام در ساعت",
+            "",
+            f"حد: {limit if limit > 0 else 'دی‌هیچ‌محدودیتی نیست'}",
+            f"صد روز: {count}",
+        ]
+        if next_reset:
+            try:
+                reset_dt = datetime.fromisoformat(str(next_reset).replace("Z", "+00:00"))
+                if reset_dt.tzinfo is None:
+                    reset_dt = reset_dt.replace(tzinfo=timezone.utc)
+                minutes_left = int((reset_dt - datetime.now(timezone.utc)).total_seconds() / 60)
+                lines.append(f"ریست در: {max(0, minutes_left)} دقیقه")
+            except Exception:
+                lines.append(f"ریست: {next_reset}")
+        lines.append(f"پیام‌های در انتظار خلاصه: {len(queue)}")
+        lines.append("\n/digest now — فوراً خلاصه بزن")
+        
+        bot.send_message(message.chat.id, "\n".join(lines))
+    except Exception as e:
+        bot.send_message(message.chat.id, f"خطا: {e}")
+
+
 @bot.message_handler(commands=["bot"])
 def cmd_bot(message):
     global BOT_ACTIVE
@@ -3457,7 +3811,7 @@ def cmd_bot(message):
 def cmd_filter(message):
     """Manage article filters: block keywords, categories, sources."""
     user = upsert_user(message)
-    parts = (message.text or "").split(maxsplit=2)
+    parts = (message.text or "").split()
     if len(parts) < 2:
         _send_filter_help(message.chat.id)
         return
@@ -3542,23 +3896,32 @@ def _send_filter_help(chat_id: int):
 
 
 def _filter_add(message, parts, uid: int, user: dict):
-    if len(parts) < 3:
+    # Expected: /filter add <type> <value> [label]
+    # parts[0] = /filter, parts[1] = add
+    if len(parts) < 4:
         bot.send_message(message.chat.id, "فرمت: /filter add <type> <value> [label]")
+        bot.send_message(message.chat.id,
+                         "مثال: /filter add block_keyword پورنهاب")
         bot.send_message(message.chat.id,
                          "نوع: block_keyword | block_category | block_source | only_keyword")
         return
     ftype = parts[2].strip().lower()
     if ftype not in ("block_keyword", "block_category", "block_source", "only_keyword"):
         bot.send_message(message.chat.id,
-                         "نوع نامعتبر. نوع: block_keyword | block_category | block_source | only_keyword")
+                         f"نوع نامعتبر: {ftype}\nنوع‌های مجاز: block_keyword | block_category | block_source | only_keyword")
         return
-    rest = parts[3] if len(parts) > 3 else ""
-    value_and_label = rest.split("|", 1) if "|" in rest else (rest, "")
-    fval = value_and_label[0].strip()
+    # parts[3] is the value (can be Persian text)
+    fval = parts[3].strip()
     if not fval:
         bot.send_message(message.chat.id, "مقدار (کلمه/دسته/منبع) لازم است.")
         return
-    fname = value_and_label[1].strip() if len(value_and_label) > 1 else f"{ftype}: {fval}"
+    # Optional label: can contain | separator or just more text
+    rest = " ".join(parts[4:]) if len(parts) > 4 else ""
+    if "|" in rest:
+        value_and_label = rest.split("|", 1)
+        fname = value_and_label[1].strip() if len(value_and_label) > 1 else f"{ftype}: {fval}"
+    else:
+        fname = rest.strip() if rest.strip() else f"{ftype}: {fval}"
     try:
         rows = sb_post("article_filters", [{
             "user_id": uid,
@@ -3920,6 +4283,21 @@ def on_callback(call):
             "/filter del <id> — حذف فیلتر\n"
             "/filter on|off — فعال/غیرفعال کردن همه",
         )
+    elif data == "menu:hourly":
+        # Show hourly limit settings
+        hourly_limit = get_hourly_limit(user)
+        count = user.get("hourly_posts_count", 0) or 0
+        msg = (
+            f"⏰ حداکثر پیام در ساعت\n\n"
+            f"حد فعلی: {hourly_limit if hourly_limit > 0 else 'بدون حد'}\n"
+            f"پیام امروز: {count}\n\n"
+            f"دستورها:\n"
+            f"/hourlylimit <عدد> — حداکثر پیام در ساعت (مثال: `/hourlylimit 2`)\n"
+            f"/hourlylimit off — غیرفعال\n"
+            f"/hourlystatus — وضعیت دقیق\n\n"
+            f"وقتی حد رسیده: پیام‌های جدید در صف می‌مونن و در انتهای ساعت به عنوان خلاصه منتشر می‌شن."
+        )
+        bot.send_message(call.from_user.id, msg, parse_mode="HTML")
     elif data == "set:bot_on":
         if ADMIN_TELEGRAM_IDS and user["telegram_id"] not in ADMIN_TELEGRAM_IDS:
             bot.send_message(call.from_user.id, "فقط ادمین.")
@@ -3975,6 +4353,9 @@ def settings_text(user: dict) -> str:
     dig = "روشن" if digest_enabled(user) else "خاموش"
     filter_count = len(load_user_filters(uid))
     bot_status = "فعال 🟢" if BOT_ACTIVE else "غیرفعال ⚪️"
+    hourly_limit = get_hourly_limit(user)
+    hourly_display = f"{hourly_limit}/h" if hourly_limit > 0 else "بدون حد"
+    hourly_count = user.get("hourly_posts_count", 0) or 0
     return (
         f"⚙️ تنظیمات ربات\n\n"
         f"📺 کانال: {ch}\n"
@@ -3985,6 +4366,7 @@ def settings_text(user: dict) -> str:
         f"🤖 هوش مصنوعی: {PROVIDERS.get(provider, {}).get('label', provider)} · {model}\n"
         f"🔑 کلید AI: {'دارد ✅' if key else 'ندارد ❌'}\n"
         f"🎯 فیلترهای شخصی: {filter_count} عدد\n"
+        f"⏰ حد پیام/ساعت: {hourly_display} (امروز: {hourly_count})\n"
         f"🤖 وضعیت ربات: {bot_status}\n"
         f"زنجیره: {' → '.join(AI_CHAIN)}\n"
         f"✍️ متن پایانی: {user.get('channel_footer') or DEFAULT_CHANNEL_FOOTER or '—'}\n"
