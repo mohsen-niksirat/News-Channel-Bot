@@ -4284,20 +4284,23 @@ def on_callback(call):
             "/filter on|off — فعال/غیرفعال کردن همه",
         )
     elif data == "menu:hourly":
-        # Show hourly limit settings
+        # Show hourly limit settings with quick buttons
         hourly_limit = get_hourly_limit(user)
         count = user.get("hourly_posts_count", 0) or 0
+        current = hourly_limit if hourly_limit > 0 else 0
+        kb = InlineKeyboardMarkup(row_width=4)
+        # Add common limit buttons
+        for val in [1, 2, 3, 4, 5, 0]:
+            mark = "✅" if val == current else ""
+            label = f"{mark}{val}" if val > 0 else f"{mark}off"
+            kb.add(InlineKeyboardButton(label, callback_data=f"set:hourly:{val}"))
         msg = (
             f"⏰ حداکثر پیام در ساعت\n\n"
             f"حد فعلی: {hourly_limit if hourly_limit > 0 else 'بدون حد'}\n"
             f"پیام امروز: {count}\n\n"
-            f"دستورها:\n"
-            f"/hourlylimit <عدد> — حداکثر پیام در ساعت (مثال: `/hourlylimit 2`)\n"
-            f"/hourlylimit off — غیرفعال\n"
-            f"/hourlystatus — وضعیت دقیق\n\n"
-            f"وقتی حد رسیده: پیام‌های جدید در صف می‌مونن و در انتهای ساعت به عنوان خلاصه منتشر می‌شن."
+            f"روی یک دکمه را فشار دهید:"
         )
-        bot.send_message(call.from_user.id, msg, parse_mode="HTML")
+        bot.send_message(call.from_user.id, msg, reply_markup=kb)
     elif data == "set:bot_on":
         if ADMIN_TELEGRAM_IDS and user["telegram_id"] not in ADMIN_TELEGRAM_IDS:
             bot.send_message(call.from_user.id, "فقط ادمین.")
@@ -4317,6 +4320,24 @@ def on_callback(call):
         BOT_ACTIVE = False
         log.info("Bot deactivated via callback by user %s", user["telegram_id"])
         bot.send_message(call.from_user.id, "⚪️ ربات غیرفعال شد. اسکن متوقف شد. /bot on برای فعال‌سازی.")
+        u2 = get_user(user["telegram_id"]) or user
+        try:
+            bot.edit_message_text(settings_text(u2), chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=settings_keyboard(u2))
+        except Exception:
+            pass
+    elif data.startswith("set:hourly:"):
+        # Set hourly limit via callback
+        try:
+            val = int(data.split(":", 2)[2])
+        except ValueError:
+            bot.send_message(call.from_user.id, "مقدار نامعتبر.")
+            return
+        sb_patch(
+            f"bot_users?telegram_id=eq.{user['telegram_id']}",
+            {"max_posts_per_hour": val, "updated_at": utcnow_iso()},
+        )
+        display = f"{val}/h" if val > 0 else "بدون حد"
+        bot.send_message(call.from_user.id, f"✅ حد پیام در ساعت تنظیم شد: {display}")
         u2 = get_user(user["telegram_id"]) or user
         try:
             bot.edit_message_text(settings_text(u2), chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=settings_keyboard(u2))
