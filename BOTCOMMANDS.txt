@@ -30,6 +30,7 @@ footer - Channel footer text
 digest - Periodic round-up post
 hourlylimit - Set max posts per hour (sends summary when limit reached)
 hourlystatus - Show current hourly quota status
+schedule - Smart content scheduling (publish at optimal hours, mix news+fun)
 settings - Bot settings
 bot - Enable/disable bot scanning (admin only)
 adminstats - Admin stats

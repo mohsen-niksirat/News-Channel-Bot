@@ -612,6 +612,50 @@ def extract_feed_images(item, limit: int = 3) -> list:
     return urls[: max(0, limit)]
 
 
+# ============================================================
+# Smart Content Scheduling (inserted before ensure_article)
+# ============================================================
+
+def is_breaking_news(article: dict) -> bool:
+    """Heuristic: detect if article is breaking/urgent news."""
+    title = (article.get("title") or "").lower()
+    summary = (article.get("summary") or "").lower()
+    text = f"{title} {summary}"
+    urgent_keywords = [
+        "برکینگ", "فوری", "مهم", "بحرانی", "هشدار", "آتش‌سوزی", "زلزله",
+        "attacking", "breaking", "urgent", "emergency", "outbreak",
+    ]
+    return any(kw in text for kw in urgent_keywords)
+
+
+def detect_content_type(title: str, summary: str, source_name: str, category: str) -> str:
+    """
+    Detect if content is fun/entertainment vs serious news.
+    Returns: 'news' | 'fun' | 'entertainment' | 'meme'
+    """
+    text = f" {title} {summary} {source_name} {category} ".lower()
+    fun_keywords = [
+        "فان", "سرگرمی", "موشن", "ویدیو", "انیمیشن", "خنده‌دار", "جذاب", "خفن",
+        "نوستالژی", "طنز", "شو", "کمدی", "fun", "entertainment", "comedy", "viral",
+        "meme", "joke", "funny", "movie", "tv show", "series", "netflix", "youtube",
+    ]
+    celeb_keywords = [
+        "ستاره", "جذابه", "بازیگر", "خواننده", "ترانه", "امتیاز", "فیلم",
+        "celebrity", "actor", "singer", "pop", "star", "fandom",
+    ]
+    meme_keywords = ["میم", "ریپلای", "چالش", "challenge", "meme"]
+    
+    if any(kw in text for kw in meme_keywords):
+        return "meme"
+    if any(kw in text for kw in celeb_keywords):
+        return "entertainment"
+    if any(kw in text for kw in fun_keywords):
+        return "fun"
+    if category in ("sports", "entertainment", "gaming", "cinema", "music"):
+        return "entertainment"
+    return "news"
+
+
 def ensure_article(source_row: dict, item: dict):
     title = strip_html(item.get("title") or "").strip()
     link = (item.get("link") or "").strip()
@@ -640,6 +684,10 @@ def ensure_article(source_row: dict, item: dict):
             )
         except Exception:
             published = None
+    # Detect content type (news vs fun vs entertainment)
+    category = source_row.get("category") or "world"
+    source_name = source_row.get("name") or ""
+    content_type = detect_content_type(title, summary[:500], source_name, category)
     payload = [{
         "source_id": source_row.get("id"),
         "guid": guid,
@@ -647,8 +695,9 @@ def ensure_article(source_row: dict, item: dict):
         "title": title[:500],
         "summary": summary,
         "source_lang": source_row.get("lang") or "en",
-        "source_name": source_row.get("name") or "",
-        "category": source_row.get("category") or "world",
+        "source_name": source_name,
+        "category": category,
+        "content_type": content_type,
         "published_at": published,
         "images": images,
     }]
@@ -1479,6 +1528,11 @@ def settings_keyboard(user: dict) -> InlineKeyboardMarkup:
     hourly_limit = get_hourly_limit(user)
     hourly_display = f"{hourly_limit}/h" if hourly_limit > 0 else "بدون حد"
     kb.add(InlineKeyboardButton(f"⏰ حد پیام/ساعت: {hourly_display}", callback_data="menu:hourly"))
+    # Smart schedule
+    sched_on = user.get("smart_schedule_enabled", True)
+    sched_hours = user.get("preferred_publish_hours", "08,12,18,21")
+    sched_display = "🟢" if sched_on else "⚪️"
+    kb.add(InlineKeyboardButton(f"{sched_display} 📅 زمان‌بندی: {sched_hours}", callback_data="menu:schedule"))
     if BOT_ACTIVE:
         kb.add(InlineKeyboardButton("✅ ربات فعال", callback_data="set:bot_off"))
     else:
@@ -1790,6 +1844,176 @@ def article_passes_filters(article: dict, filters: list[dict], source_row: dict)
     return True
 
 
+# ============================================================
+# Smart Content Scheduling
+# ============================================================
+
+def get_user_scheduling_config(user: dict) -> dict:
+    """Get user's smart scheduling configuration."""
+    return {
+        "enabled": user.get("smart_schedule_enabled", True),
+        "preferred_hours": user.get("preferred_publish_hours", "08,12,18,21"),
+        "content_mix": user.get("content_mix") or {"serious": 0.8, "fun": 0.2},
+        "include_fun": user.get("includes_fun_content", True),
+        "min_per_hour": user.get("min_posts_per_hour", 2),
+        "max_per_hour": user.get("max_posts_per_hour", 6),
+    }
+
+
+def parse_preferred_hours(hours_str: str) -> set[int]:
+    """Parse '08,12,18,21' into set of hour ints."""
+    hours = set()
+    for h in hours_str.split(","):
+        h = h.strip()
+        if h.isdigit():
+            hour = int(h)
+            if 0 <= hour <= 23:
+                hours.add(hour)
+    return hours
+
+
+def is_optimal_publish_time(user: dict) -> bool:
+    """Check if current time is in user's preferred publish hours."""
+    config = get_user_scheduling_config(user)
+    if not config["enabled"]:
+        return True  # Scheduling disabled - always allow
+    preferred_hours = parse_preferred_hours(config["preferred_hours"])
+    if not preferred_hours:
+        return True  # No hours set - always allow
+    # Get current time in Iran timezone (UTC+3:30)
+    from datetime import timedelta
+    iran_tz = timezone(timedelta(hours=3, minutes=30))
+    now_iran = datetime.now(iran_tz)
+    current_hour = now_iran.hour
+    return current_hour in preferred_hours
+
+
+def should_publish_now(user: dict, article: dict, current_hourly_count: int) -> tuple[bool, str]:
+    """
+    Intelligent decision: should we publish this article right now?
+    Returns (should_publish, reason).
+    
+    Factors:
+    - Is it an optimal time?
+    - Are we at the hourly limit?
+    - What type of content is it?
+    - What's the current mix?
+    """
+    config = get_user_scheduling_config(user)
+    content_type = article.get("content_type", "news")
+    
+    # 1. Check if we're at the max limit
+    if current_hourly_count >= config["max_per_hour"]:
+        return False, f"At max hourly limit ({config['max_per_hour']})"
+    
+    # 2. Check optimal time
+    optimal_time = is_optimal_publish_time(user)
+    if not optimal_time:
+        # Not optimal time - only publish if content is very important
+        if content_type == "news" and is_breaking_news(article):
+            return True, "Breaking news - bypass time restriction"
+        return False, f"Not in preferred hours ({config['preferred_hours']})"
+    
+    # 3. Content mix check - ensure we're not publishing too many fun items
+    if content_type in ("fun", "entertainment", "meme"):
+        if not config["include_fun"]:
+            return False, "Fun content disabled"
+        # Check if we've hit the fun content ratio for this hour
+        if current_hourly_count > 0:
+            # Rough estimate: if we've published more than fun% of current posts as fun
+            fun_ratio = config["content_mix"].get("fun", 0.2)
+            if current_hourly_count >= 1 and (current_hourly_count // max(1, int(1/fun_ratio))) >= 1:
+                return False, "Fun content quota reached for this hour"
+    
+    # 4. All good - publish
+    return True, "OK to publish"
+
+
+def is_breaking_news(article: dict) -> bool:
+    """Heuristic: detect if article is breaking/urgent news."""
+    title = (article.get("title") or "").lower()
+    summary = (article.get("summary") or "").lower()
+    text = f"{title} {summary}"
+    
+    urgent_keywords = [
+        "برکینگ", "فوری", "مهم", "بحرانی", "هشدار", "آتش‌سوزی", "زلزله",
+        "attacking", "breaking", "urgent", "emergency", "outbreak", "breaking",
+    ]
+    return any(kw in text for kw in urgent_keywords)
+
+
+def detect_content_type(title: str, summary: str, source_name: str, category: str) -> str:
+    """
+    Detect if content is fun/entertainment vs serious news.
+    Returns: 'news' | 'fun' | 'entertainment' | 'meme'
+    """
+    text = f" {title} {summary} {source_name} {category} ".lower()
+    
+    # Fun/entertainment indicators
+    fun_keywords = [
+        "فان", "سرگرمی", "گوشه خانگی", "موشن", "ویدیو", "انیمیشن", "خنده‌دار",
+        "جذاب", "خفن", "جدید", "نوستالژی", "طنز", "شو", "کمدی",
+        "fun", "entertainment", "comedy", "viral", "meme", "joke", "funny",
+        "movie", "tv show", "series", "netflix", "youtube",
+    ]
+    
+    # Entertainment/celebrity indicators
+    celeb_keywords = [
+        "ستاره", "جذابه", "بازیگر", "خواننده", "ترانه", "امتیاز", "فیلم",
+        "celebrity", "actor", "singer", "pop", "star", "fandom",
+    ]
+    
+    # Meme/sports indicators (sports = often fun-adjacent)
+    meme_keywords = ["میم", "ریپلای", "نقشه", "چالش", "challenge", "meme"]
+    
+    is_fun = any(kw in text for kw in fun_keywords)
+    is_celeb = any(kw in text for kw in celeb_keywords)
+    is_meme = any(kw in text for kw in meme_keywords)
+    
+    if is_meme:
+        return "meme"
+    if is_celeb:
+        return "entertainment"
+    if is_fun:
+        return "fun"
+    
+    # Sports and entertainment categories are lighter content
+    if category in ("sports", "entertainment", "gaming", "cinema", "music"):
+        return "entertainment"
+    
+    return "news"
+
+
+def get_current_hourly_content_stats(user_id: int) -> dict:
+    """Get stats on what's been published this hour (for content mix tracking)."""
+    try:
+        rows = sb_get(
+            f"drafts?user_id=eq.{user_id}&status=eq.published&published_at=gte.{utcnow_iso()}"
+        )
+        stats = {"total": len(rows), "news": 0, "fun": 0, "entertainment": 0, "meme": 0}
+        for r in rows:
+            # Look up article to get content_type
+            aid = r.get("article_id")
+            if aid:
+                article = find_article_by_id(aid)
+                if article:
+                    ct = article.get("content_type", "news")
+                    stats[ct] = stats.get(ct, 0) + 1
+        return stats
+    except Exception:
+        return {"total": 0}
+
+
+def smart_publish_decision(user: dict, article: dict, current_hourly_count: int) -> bool:
+    """Main decision point: use intelligent algorithm to decide publish vs queue."""
+    should_pub, reason = should_publish_now(user, article, current_hourly_count)
+    if not should_pub:
+        log.debug("Smart schedule: skipping user=%s reason=%s content=%s", 
+                  user.get("telegram_id"), reason, article.get("content_type"))
+        return False
+    return True
+
+
 def process_user_scan(user_id: int):
     # FIX: Check BOT_ACTIVE before processing (respects /bot off)
     if not BOT_ACTIVE:
@@ -1936,7 +2160,7 @@ def process_user_scan(user_id: int):
             # Check hourly post limit (applies to both auto and manual mode)
             hourly_limit = get_hourly_limit(user)
             current_count = 0
-            if hourly_limit > 0 and BOT_ACTIVE:
+            if (hourly_limit > 0 or get_hourly_limit(user) > 0) and BOT_ACTIVE:
                 user_refreshed = get_user(user_id) or user
                 current_count = user_refreshed.get("hourly_posts_count", 0) or 0
                 
@@ -1955,6 +2179,17 @@ def process_user_scan(user_id: int):
                 if current_count >= hourly_limit:
                     # Limit reached - queue for hourly summary
                     log.debug("Hourly limit reached user=%s count=%d limit=%d", user_id, current_count, hourly_limit)
+                    queue_for_hourly(user_id, article["id"], fa or (article.get("title") or "")[:200])
+                    time.sleep(0.15)
+                    continue
+
+            # SMART SCHEDULING DECISION
+            # Use intelligent algorithm to decide publish vs queue
+            config = get_user_scheduling_config(user)
+            if config["enabled"] and auto and BOT_ACTIVE:
+                if not smart_publish_decision(user, article, current_count):
+                    # Queue for later (smart scheduling says not now)
+                    log.debug("Smart schedule: queuing user=%s article=%s", user_id, article.get("id"))
                     queue_for_hourly(user_id, article["id"], fa or (article.get("title") or "")[:200])
                     time.sleep(0.15)
                     continue
@@ -3343,6 +3578,144 @@ def cmd_discussion(message):
     )
 
 
+# ============================================================
+# Smart Schedule command
+# ============================================================
+
+@bot.message_handler(commands=["schedule", "schedulemanage"])
+def cmd_schedule(message):
+    """Manage smart content scheduling.
+
+    Subcommands:
+    /schedule status         — show current schedule settings
+    /schedule on             — enable smart scheduling
+    /schedule off            — disable (publish whenever news found)
+    /schedule hours 8,12,18,21  — set preferred publish hours (Iran time)
+    /schedule mix 0.7,0.3   — set news:fun ratio (e.g. 70% news, 30% fun)
+    /schedule fun on|off    — toggle inclusion of fun content
+    /schedule min 2 max 6   — set min/max posts per hour
+    """
+    user = upsert_user(message)
+    parts = (message.text or "").split(maxsplit=2)
+    action = parts[1].lower() if len(parts) > 1 else "status"
+    arg = parts[2].strip() if len(parts) > 2 else ""
+
+    config = get_user_scheduling_config(user)
+    hours_str = config["preferred_hours"]
+
+    if action == "status":
+        enabled = "روشن 🟢" if config["enabled"] else "خاموش ⚪️"
+        mix = config["content_mix"]
+        mix_str = f"{int(mix.get('serious', 0.8) * 100)}% خبر · {int(mix.get('fun', 0.2) * 100)}% فان"
+        bot.send_message(
+            message.chat.id,
+            f"📅 وضعیت برنامه‌ریزی هوشمند\n\n"
+            f"وضعیت: {enabled}\n"
+            f"ساعت‌های انتشار: {hours_str} (به وقت ایران)\n"
+            f"توزیع محتوا: {mix_str}\n"
+            f"فان: {'شامل می‌شود' if config['include_fun'] else 'حذف'}\n"
+            f"حداقل/حداکثر پیام/ساعت: {config['min_per_hour']}/{config['max_per_hour']}\n\n"
+            f"دستورها:\n"
+            f"/schedule on | off\n"
+            f"/schedule hours 8,12,18,21\n"
+            f"/schedule mix 0.7,0.3\n"
+            f"/schedule fun on | off\n"
+            f"/schedule min 2 max 6",
+        )
+        return
+
+    if action in ("on", "روشن"):
+        sb_patch(f"bot_users?telegram_id=eq.{user['telegram_id']}",
+                 {"smart_schedule_enabled": True, "updated_at": utcnow_iso()})
+        bot.send_message(message.chat.id, "✅ برنامه‌ریزی هوشمند روشن شد. خبرها در ساعات با بازدهی بالاتر منتشر می‌شوند.")
+        return
+
+    if action in ("off", "خاموش"):
+        sb_patch(f"bot_users?telegram_id=eq.{user['telegram_id']}",
+                 {"smart_schedule_enabled": False, "updated_at": utcnow_iso()})
+        bot.send_message(message.chat.id, "⚪️ برنامه‌ریزی هوشمند خاموش شد. همه خبرها به‌صورت مداوم منتشر می‌شوند.")
+        return
+
+    if action == "hours":
+        hours = ",".join(str(int(h)) for h in arg.split(",") if h.strip().isdigit())
+        if not hours:
+            bot.send_message(message.chat.id, "فرمت: /schedule hours 8,12,18,21 (ساعت ۰ تا ۲۳)")
+            return
+        sb_patch(f"bot_users?telegram_id=eq.{user['telegram_id']}",
+                 {"preferred_publish_hours": hours, "updated_at": utcnow_iso()})
+        bot.send_message(message.chat.id, f"✅ ساعت‌های انتشار تنظیم شد: {hours} (به وقت ایران)")
+        return
+
+    if action == "mix":
+        try:
+            parts_mix = arg.split(",")
+            serious = float(parts_mix[0].strip()) if parts_mix and parts_mix[0].strip() else 0.8
+            fun = float(parts_mix[1].strip()) if len(parts_mix) > 1 and parts_mix[1].strip() else (1.0 - serious)
+            total = serious + fun
+            if total <= 0:
+                serious, fun = 0.8, 0.2
+            else:
+                serious = serious / total
+                fun = fun / total
+            sb_patch(f"bot_users?telegram_id=eq.{user['telegram_id']}",
+                    {"content_mix": {"serious": round(serious, 2), "fun": round(fun, 2)},
+                     "updated_at": utcnow_iso()})
+            bot.send_message(
+                message.chat.id,
+                f"✅ توزیع محتوا تنظیم شد: {int(serious*100)}% خبر · {int(fun*100)}% فان",
+            )
+        except (ValueError, IndexError):
+            bot.send_message(message.chat.id, "فرمت: /schedule mix 0.7,0.3")
+        return
+
+    if action == "fun":
+        include_fun = arg.lower() in ("on", "روشن", "true", "1", "")
+        sb_patch(f"bot_users?telegram_id=eq.{user['telegram_id']}",
+                 {"includes_fun_content": include_fun, "updated_at": utcnow_iso()})
+        bot.send_message(
+            message.chat.id,
+            "✅ فان شامل می‌شود" if include_fun else "⚪️ فان حذف شد",
+        )
+        return
+
+    if action == "min":
+        # /schedule min 2
+        val = arg.strip()
+        try:
+            min_val = max(1, int(val.split()[0]))
+        except (ValueError, IndexError):
+            bot.send_message(message.chat.id, "فرمت: /schedule min <عدد> (مثلاً /schedule min 2)")
+            return
+        sb_patch(f"bot_users?telegram_id=eq.{user['telegram_id']}",
+                 {"min_posts_per_hour": min_val, "updated_at": utcnow_iso()})
+        bot.send_message(message.chat.id, f"✅ حداقل پیام/ساعت: {min_val}")
+        return
+
+    if action == "max":
+        val = arg.strip()
+        try:
+            max_val = min(20, int(val.split()[0]))
+        except (ValueError, IndexError):
+            bot.send_message(message.chat.id, "فرمت: /schedule max <عدد> (مثلاً /schedule max 6)")
+            return
+        sb_patch(f"bot_users?telegram_id=eq.{user['telegram_id']}",
+                 {"max_posts_per_hour": max_val, "updated_at": utcnow_iso()})
+        bot.send_message(message.chat.id, f"✅ حداکثر پیام/ساعت: {max_val}")
+        return
+
+    # Unknown
+    bot.send_message(
+        message.chat.id,
+        "فرمت:\n"
+        "/schedule on | off\n"
+        "/schedule hours 8,12,18,21\n"
+        "/schedule mix 0.7,0.3\n"
+        "/schedule fun on | off\n"
+        "/schedule min 2\n"
+        "/schedule max 6",
+    )
+
+
 @bot.message_handler(commands=["footer"])
 def cmd_footer(message):
     user = upsert_user(message)
@@ -4306,6 +4679,44 @@ def on_callback(call):
             f"روی یک دکمه را فشار دهید:"
         )
         bot.send_message(call.from_user.id, msg, reply_markup=kb)
+    elif data == "menu:schedule":
+        # Show smart schedule settings
+        config = get_user_scheduling_config(user)
+        hours_str = config["preferred_hours"]
+        mix = config["content_mix"]
+        enabled = "🟢 روشن" if config["enabled"] else "⚪️ خاموش"
+        msg = (
+            f"📅 برنامه‌ریزی هوشمند\n\n"
+            f"وضعیت: {enabled}\n"
+            f"ساعت‌های انتشار: {hours_str} (به وقت ایران)\n"
+            f"توزیع: {int(mix.get('serious', 0.8) * 100)}% خبر · {int(mix.get('fun', 0.2) * 100)}% فان\n"
+            f"فان: {'شامل می‌شود' if config['include_fun'] else 'حذف'}\n"
+            f"حداقل/حداکثر: {config['min_per_hour']}/{config['max_per_hour']}\n\n"
+            f"دستور: /schedule — برای تنظیم دقیق"
+        )
+        kb = InlineKeyboardMarkup(row_width=1)
+        kb.add(InlineKeyboardButton(
+            "🟢 فعال" if config["enabled"] else "⚪️ غیرفعال",
+            callback_data=f"set:schedule_toggle",
+        ))
+        bot.send_message(call.from_user.id, msg, reply_markup=kb)
+    elif data == "set:schedule_toggle":
+        # Toggle smart schedule
+        new_val = not user.get("smart_schedule_enabled", True)
+        sb_patch(
+            f"bot_users?telegram_id=eq.{user['telegram_id']}",
+            {"smart_schedule_enabled": new_val, "updated_at": utcnow_iso()},
+        )
+        u2 = get_user(user["telegram_id"]) or user
+        try:
+            bot.edit_message_text(
+                settings_text(u2),
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=settings_keyboard(u2),
+            )
+        except Exception:
+            pass
     elif data == "set:bot_on":
         if ADMIN_TELEGRAM_IDS and user["telegram_id"] not in ADMIN_TELEGRAM_IDS:
             bot.send_message(call.from_user.id, "فقط ادمین.")
@@ -4382,6 +4793,11 @@ def settings_text(user: dict) -> str:
     hourly_limit = get_hourly_limit(user)
     hourly_display = f"{hourly_limit}/h" if hourly_limit > 0 else "بدون حد"
     hourly_count = user.get("hourly_posts_count", 0) or 0
+    sched = get_user_scheduling_config(user)
+    sched_display = "روشن 🟢" if sched["enabled"] else "خاموش ⚪️"
+    sched_hours = sched["preferred_hours"]
+    mix = sched["content_mix"]
+    mix_str = f"{int(mix.get('serious', 0.8) * 100)}% خبر · {int(mix.get('fun', 0.2) * 100)}% فان"
     return (
         f"⚙️ تنظیمات ربات\n\n"
         f"📺 کانال: {ch}\n"
@@ -4393,6 +4809,8 @@ def settings_text(user: dict) -> str:
         f"🔑 کلید AI: {'دارد ✅' if key else 'ندارد ❌'}\n"
         f"🎯 فیلترهای شخصی: {filter_count} عدد\n"
         f"⏰ حد پیام/ساعت: {hourly_display} (امروز: {hourly_count})\n"
+        f"📅 زمان‌بندی هوشمند: {sched_display} · ساعت‌ها: {sched_hours}\n"
+        f"   توزیع محتوا: {mix_str}\n"
         f"🤖 وضعیت ربات: {bot_status}\n"
         f"زنجیره: {' → '.join(AI_CHAIN)}\n"
         f"✍️ متن پایانی: {user.get('channel_footer') or DEFAULT_CHANNEL_FOOTER or '—'}\n"
