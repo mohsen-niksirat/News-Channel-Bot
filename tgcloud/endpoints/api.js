@@ -3,7 +3,7 @@
  * Endpoint URL: https://cloud.telegram.org/<APP_ID>/endpoints/api
  */
 
-import { db } from 'sdk';
+import { db, api } from 'sdk';
 import { eq, and } from 'sdk/db';
 import { users, aiKeys, sources, customProviders } from 'schema';
 import {
@@ -98,11 +98,31 @@ export default async function (input, ctx) {
   // 2. Trigger Health Check
   if (action === 'test_keys') {
     const report = await runHealthCheckForUser(userId);
+    if (userId) {
+      await api.sendMessage({
+        chat_id: userId,
+        text: report.html,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔄 تست مجدد سلامت', callback_data: 'act:test_keys' }],
+            [{ text: '🔙 بازگشت به تنظیمات', callback_data: 'm:ai_settings' }],
+          ],
+        },
+      }).catch((err) => console.warn('Send health report error:', err.message));
+    }
     return { ok: true, report };
   }
 
   // 3. Trigger Scan
   if (action === 'trigger_scan') {
+    if (userId) {
+      await api.sendMessage({
+        chat_id: userId,
+        text: '⏳ <b>درخواست پایش فوری از مینی‌اپ دریافت شد!</b>\nدر حال اسکن منابع و آماده‌سازی خبرها...',
+        parse_mode: 'HTML',
+      }).catch(() => {});
+    }
     // Run scan in background
     runScanForUser(userId, userId).catch((err) => console.error('Scan error:', err));
     return { ok: true, message: 'Scan initiated' };

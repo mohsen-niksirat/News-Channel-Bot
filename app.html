@@ -182,13 +182,13 @@
           <span>عملیات‌های زنده پایش و تست</span>
         </div>
         <div class="grid grid-cols-2 gap-2.5">
-          <button onclick="triggerScanNow()" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/20 active:scale-95 transition-all">
-            <span>🔍</span>
-            <span>اسکن فوری منابع</span>
+          <button id="btnScanNow" onclick="triggerScanNow()" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/20 active:scale-95 transition-all">
+            <span id="iconScanNow">🔍</span>
+            <span id="txtScanNow">اسکن فوری منابع</span>
           </button>
-          <button onclick="triggerHealthCheck()" class="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all">
-            <span>🧪</span>
-            <span>تست سلامت کلیدها</span>
+          <button id="btnHealthCheck" onclick="triggerHealthCheck()" class="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+            <span id="iconHealthCheck">🧪</span>
+            <span id="txtHealthCheck">تست سلامت کلیدها</span>
           </button>
         </div>
       </div>
@@ -544,20 +544,114 @@
       }
     }
 
-    function triggerScanNow() {
+    async function triggerScanNow() {
       haptic('heavy');
-      showToast('دستور پایش فوری به ربات ارسال شد', '🔍');
-      if (tg?.sendData) {
-        tg.sendData(JSON.stringify({ action: 'trigger_scan' }));
+      showToast('دستور پایش فوری به ربات ارسال شد 🔍', '⏳');
+
+      // 1. Try TMA sendData
+      try {
+        if (tg?.sendData) {
+          tg.sendData(JSON.stringify({ action: 'trigger_scan' }));
+        }
+      } catch (e) {}
+
+      // 2. Call Serverless RPC
+      if (window.Telegram?.WebApp?.Serverless?.call) {
+        try {
+          window.Telegram.WebApp.Serverless.call('api', { action: 'trigger_scan', userId: currentUserId }, function (err, res) {
+            if (!err) {
+              showToast('پایش منابع آغاز شد؛ پیام در چت ارسال می‌شود 🚀', '✅');
+            }
+          });
+          return;
+        } catch (e) {}
       }
+
+      // 3. Fallback POST /api/api
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (tg?.initData) headers['Authorization'] = 'TMA ' + window.btoa(tg.initData);
+        await fetch('/api/api', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ action: 'trigger_scan', userId: currentUserId }),
+        });
+      } catch (e) {}
     }
 
-    function triggerHealthCheck() {
+    async function triggerHealthCheck() {
       haptic('medium');
-      showToast('در حال ارزیابی سلامت کلیدها...', '🧪');
-      if (tg?.sendData) {
-        tg.sendData(JSON.stringify({ action: 'test_keys' }));
+      const btn = document.getElementById('btnHealthCheck');
+      const icon = document.getElementById('iconHealthCheck');
+      const txt = document.getElementById('txtHealthCheck');
+
+      if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-75');
       }
+      if (icon) icon.innerText = '⏳';
+      if (txt) txt.innerText = 'در حال تست...';
+
+      showToast('در حال ارزیابی سلامت کلیدها...', '🧪');
+
+      function resetBtn() {
+        if (btn) {
+          btn.disabled = false;
+          btn.classList.remove('opacity-75');
+        }
+        if (icon) icon.innerText = '🧪';
+        if (txt) txt.innerText = 'تست سلامت کلیدها';
+      }
+
+      // 1. Try TMA sendData
+      try {
+        if (tg?.sendData) {
+          tg.sendData(JSON.stringify({ action: 'test_keys' }));
+        }
+      } catch (e) {}
+
+      // 2. Call Serverless RPC
+      if (window.Telegram?.WebApp?.Serverless?.call) {
+        try {
+          window.Telegram.WebApp.Serverless.call('api', { action: 'test_keys', userId: currentUserId }, function (err, result) {
+            resetBtn();
+            if (!err && result && result.ok && result.report) {
+              showToast(`تست تکمیل شد: ${result.report.activeKeys} از ${result.report.totalKeys} کلید فعال`, '✅');
+              openHealthModal(result.report);
+              fetchLiveServerData();
+            } else {
+              showToast(err?.message || 'خطا در انجام تست سلامت کلیدها', '❌');
+            }
+          });
+          return;
+        } catch (e) {
+          console.warn('Serverless call failed:', e);
+        }
+      }
+
+      // 3. Fallback POST /api/api
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (tg?.initData) headers['Authorization'] = 'TMA ' + window.btoa(tg.initData);
+        const res = await fetch('/api/api', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ action: 'test_keys', userId: currentUserId }),
+        });
+        if (res.ok) {
+          const result = await res.json();
+          resetBtn();
+          if (result && result.ok && result.report) {
+            showToast(`تست تکمیل شد: ${result.report.activeKeys} از ${result.report.totalKeys} کلید فعال`, '✅');
+            openHealthModal(result.report);
+            fetchLiveServerData();
+            return;
+          }
+        }
+      } catch (e) {}
+
+      resetBtn();
+      showToast('درخواست ارسال شد؛ گزارش در تلگرام تحویل می‌گردد', '✅');
     }
 
     // Render Keys
@@ -791,6 +885,37 @@
       }
     }
 
+    // Health Check Modal logic
+    function openHealthModal(report) {
+      const modal = document.getElementById('healthModal');
+      const badge = document.getElementById('healthModalBadge');
+      const content = document.getElementById('healthModalContent');
+
+      if (badge && report) {
+        badge.innerText = `${report.activeKeys} از ${report.totalKeys} کلید فعال است`;
+        badge.className = report.activeKeys > 0 ? 'font-bold text-emerald-400' : 'font-bold text-red-400';
+      }
+
+      if (content && report?.html) {
+        content.innerHTML = report.html
+          .replace(/<b>/g, '<strong class="text-white">')
+          .replace(/<\/b>/g, '</strong>')
+          .replace(/<code>/g, '<code class="bg-black/30 px-1 py-0.5 rounded text-indigo-300 font-mono text-[10px]">')
+          .replace(/<\/code>/g, '</code>')
+          .replace(/<i>/g, '<em class="text-slate-400 not-italic">')
+          .replace(/<\/i>/g, '</em>')
+          .replace(/━━━━━━━━━━━━━━━━━━━━/g, '<hr class="border-white/10 my-2"/>')
+          .replace(/\n/g, '<br/>');
+      }
+
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeHealthModal() {
+      const modal = document.getElementById('healthModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
     // Set user profile info if provided by Telegram WebApp
     if (tg?.initDataUnsafe?.user) {
       const u = tg.initDataUnsafe.user;
@@ -800,6 +925,38 @@
     // Launch data fetch immediately
     fetchLiveServerData();
   </script>
+
+  <!-- Health Check Result Modal -->
+  <div id="healthModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm hidden transition-all">
+    <div class="glass-card rounded-3xl max-w-sm w-full p-5 space-y-4 border border-white/20 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between pb-3 border-b border-white/10">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🧪</span>
+          <h3 class="font-bold text-sm text-white">گزارش سلامت کلیدها و مدل‌ها</h3>
+        </div>
+        <button onclick="closeHealthModal()" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center text-xs">✕</button>
+      </div>
+
+      <div id="healthModalSummary" class="p-3 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-between text-xs">
+        <span class="text-indigo-200 font-bold">وضعیت استخر کلیدها:</span>
+        <span id="healthModalBadge" class="font-bold text-emerald-400">...</span>
+      </div>
+
+      <div id="healthModalContent" class="overflow-y-auto space-y-2 text-xs pr-1 scrollbar-thin text-slate-300 max-h-[45vh] leading-relaxed">
+        <!-- Dynamic test items -->
+      </div>
+
+      <div class="pt-2 border-t border-white/10 space-y-2">
+        <div class="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1">
+          <span>📩</span>
+          <span>گزارش کامل در چت تلگرام شما نیز ارسال شد.</span>
+        </div>
+        <button onclick="closeHealthModal()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 text-white font-bold text-xs shadow-lg shadow-brand-500/25 active:scale-95 transition-all">
+          بستن و ادامه
+        </button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
