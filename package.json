@@ -1,0 +1,13 @@
+{
+  "name": "news-studio-bot",
+  "version": "1.0.0",
+  "description": "AI-Powered Telegram News Studio & Channel Manager with Multi-Provider AI Router and Rasa Rich Post Engine",
+  "type": "module",
+  "scripts": {
+    "push": "tgcloud push",
+    "migrate": "tgcloud migrate"
+  },
+  "dependencies": {
+    "@tgcloud/cli": "^0.2.0"
+  }
+}

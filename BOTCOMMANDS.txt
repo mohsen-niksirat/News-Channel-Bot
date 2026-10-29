@@ -1,37 +1,10 @@
-start - Start and main menu
-help - Help and commands list
-channel - Connect news channel
-discussion - Connect comment group
-cleanup - Delete old handled rows now
-auto - Auto publish on or off
-scan - Scan news sources now
-review - Review pending drafts
-published - Published posts and delete
-sources - List RSS sources
-addsource - Add RSS source
-togglesource - Toggle a source
-fixsources - Fix broken feed URLs
-sourcescheck - Test all feeds
-rescan - Retry failed drafts
-sites - List all sources (RSS + social)
-addsite - Add RSS or social media source
-removesite - Remove a source
-togglesite - Enable/disable a source
-filter - Manage news filters
-ai - Choose AI provider
-model - Choose AI model
-testai - Test Persian AI
-aicheck - Test all AI providers
-balance - Remaining credits per provider
-keys - List AI keys and health
-addkey - Add an AI key
-delkey - Remove an AI key
-footer - Channel footer text
-digest - Periodic round-up post
-hourlylimit - Set max posts per hour (sends summary when limit reached)
-hourlystatus - Show current hourly quota status
-schedule - Smart content scheduling (publish at optimal hours, mix news+fun)
-settings - Bot settings
-bot - Enable/disable bot scanning (admin only)
-adminstats - Admin stats
-cancel - Cancel bind
+start - 🚀 راه‌اندازی ربات و نمایش منوی اصلی
+scan - 🔍 پایش فوری منابع و پردازش اخبار جدید با هوش مصنوعی
+review - 📑 مشاهده صف پیش‌نویس‌ها، ویرایش و تایید انتشار
+newspaper - 🗞️ تولید و دریافت روزنامه خبری هوشمند
+sources - 📡 مدیریت کانال‌ها و فیدهای خبری RSS
+ai - 🤖 مدیریت استخر کلیدها و روتر هوش مصنوعی
+testkeys - 🧪 تست سلامت کلیدها و مدل‌های فعال و رایگان
+tokens - 📊 مشاهده داشبورد و آمار مصرف توکن‌ها و هزینه‌ها
+channel - 📢 تنظیم کانال تلگرام و وضعیت انتشار خودکار
+cancel - ❌ انصراف از عملیات و بازگشت به منوی اصلی

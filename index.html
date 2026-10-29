@@ -1,701 +1,452 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" class="scroll-smooth">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NewsChannelBot — آموزش پیاده‌سازی گام‌به‌گام</title>
-<meta name="description" content="آموزش گرافیکی مرحله‌به‌مرحله راه‌اندازی NewsChannelBot: ساخت بات تلگرام، دیتابیس Supabase، کلید هوش مصنوعی و استقرار روی Deployka — با یا بدون کدنویسی.">
-<style>
-:root{
-  --bg:#0b1220; --bg2:#0f1a30; --card:#141f38; --card2:#182544;
-  --border:#24365e; --txt:#e8eefb; --muted:#93a4c3;
-  --accent:#2ea6ff; --accent2:#7c5cff; --ok:#2ecc71; --warn:#f5b942;
-  --tg:#229ED9;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{
-  font-family:Vazirmatn,'Segoe UI',Tahoma,sans-serif;
-  background:
-    radial-gradient(1200px 600px at 85% -10%, rgba(124,92,255,.18), transparent 60%),
-    radial-gradient(900px 500px at 0% 0%, rgba(46,166,255,.15), transparent 55%),
-    var(--bg);
-  color:var(--txt); line-height:1.9; min-height:100vh;
-}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-code,pre{font-family:'Cascadia Code',Consolas,Menlo,monospace;direction:ltr;text-align:left;unicode-bidi:embed}
-code{background:#0d1830;border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:.86em;color:#9fd0ff}
-pre{background:#0a1428;border:1px solid var(--border);border-radius:12px;padding:16px 18px;overflow-x:auto;font-size:.85rem;line-height:1.7;margin:12px 0;position:relative}
-pre .c{color:#5b7396}  /* comment */
-.wrap{max-width:980px;margin:0 auto;padding:24px 20px 90px}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NewsStudio 2026 — استودیو هوشمند و سرورلس اخبار تلگرام</title>
+  <meta name="description" content="ربات تحریریه خبری هوشمند و کاملاً سرورلس برای تلگرام با معماری ۹روتر، پایش خودکار فیدها و انتشار بولتن‌های حرفه‌ای" />
 
-/* ---------- language switch ---------- */
-html[lang="fa"] [data-lang="en"]{display:none!important}
-html[lang="en"] [data-lang="fa"]{display:none!important}
-.lang-switch{position:fixed;top:14px;inset-inline-end:14px;z-index:100;display:flex;background:rgba(20,31,56,.92);border:1px solid var(--border);border-radius:10px;overflow:hidden;backdrop-filter:blur(8px)}
-.lang-switch button{background:none;border:none;color:var(--muted);padding:7px 16px;cursor:pointer;font-family:inherit;font-size:.82rem;font-weight:700;transition:.2s}
-.lang-switch button.on{background:var(--accent);color:#fff}
+  <!-- Google Fonts: Vazirmatn & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Vazirmatn:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
 
-/* ---------- Hero ---------- */
-.hero{text-align:center;padding:64px 16px 40px}
-.badge-top{display:inline-flex;align-items:center;gap:8px;background:rgba(46,166,255,.12);border:1px solid rgba(46,166,255,.35);color:#9fd0ff;border-radius:999px;padding:5px 16px;font-size:.8rem;margin-bottom:20px}
-.hero h1{font-size:clamp(1.6rem,4.5vw,2.7rem);font-weight:900;background:linear-gradient(90deg,#4db5ff,#a78bff);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:12px}
-.hero p{color:var(--muted);max-width:640px;margin:0 auto 26px}
-.hero-stats{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px 18px;font-size:.83rem;color:var(--muted)}
-.stat b{color:var(--txt)}
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Vazirmatn', 'Inter', 'sans-serif'],
+            mono: ['Fira Code', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            telegram: '#24A1DE',
+            gemini: '#8E75FF',
+            surface: {
+              DEFAULT: '#0B0F19',
+              light: '#131A2A',
+              card: '#161F36',
+              border: 'rgba(255, 255, 255, 0.08)',
+            }
+          }
+        }
+      }
+    }
+  </script>
 
-/* ---------- Progress ---------- */
-.progress-box{position:sticky;top:0;z-index:50;background:rgba(11,18,32,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:10px 0;margin-bottom:36px}
-.progress-bar{max-width:980px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:14px}
-.progress-track{flex:1;height:8px;background:var(--card);border-radius:99px;overflow:hidden}
-.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;transition:width .4s}
-.progress-label{font-size:.78rem;color:var(--muted);white-space:nowrap}
-
-/* ---------- Steps ---------- */
-.step{position:relative;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:30px 30px 26px;margin-bottom:30px;scroll-margin-top:80px}
-.step::before{
-  position:absolute;top:-22px;inset-inline-start:24px;width:46px;height:46px;border-radius:14px;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));
-  display:flex;align-items:center;justify-content:center;
-  font-weight:900;font-size:1.25rem;color:#fff;box-shadow:0 6px 18px rgba(46,120,255,.35);
-}
-.step h2{font-size:1.25rem;margin:4px 0 4px;padding-inline-start:56px}
-.step .time{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:3px 12px;margin:0 56px 16px 0;margin-inline-start:56px}
-.step p{color:#c6d4ee;margin-bottom:10px}
-.step.done{border-color:rgba(46,204,113,.5)}
-.step.done::after{content:'✓';position:absolute;top:14px;inset-inline-end:16px;width:28px;height:28px;border-radius:50%;background:rgba(46,204,113,.15);border:1px solid rgba(46,204,113,.5);color:var(--ok);display:flex;align-items:center;justify-content:center;font-weight:900}
-.steplist{padding-inline-start:20px;color:#c6d4ee;font-size:.92rem}
-
-/* checklist */
-.check{display:flex;gap:10px;align-items:flex-start;background:rgba(46,204,113,.06);border:1px dashed rgba(46,204,113,.4);border-radius:12px;padding:12px 14px;margin-top:16px;cursor:pointer;transition:.2s}
-.check:hover{background:rgba(46,204,113,.12)}
-.check input{margin-top:7px;accent-color:var(--ok);width:16px;height:16px;cursor:pointer;flex-shrink:0}
-.check span{font-size:.88rem;color:#bfe8cf}
-.check .t{color:var(--muted);font-size:.75rem;display:block}
-
-/* tip / warn boxes */
-.tip,.warn{border-radius:12px;padding:13px 16px;margin:14px 0;font-size:.87rem;display:flex;gap:10px}
-.tip{background:rgba(46,166,255,.08);border:1px solid rgba(46,166,255,.3)}
-.warn{background:rgba(245,185,66,.08);border:1px solid rgba(245,185,66,.35)}
-.tip .i,.warn .i{font-size:1.1rem;flex-shrink:0}
-.tip b,.warn b{display:block;margin-bottom:2px}
-.tip{color:#a8cff2}.warn{color:#f0d9a6}
-
-/* agents callout */
-.agents{background:linear-gradient(135deg,rgba(124,92,255,.12),rgba(46,166,255,.08));border:1px solid rgba(124,92,255,.45);border-radius:16px;padding:20px 24px;margin-bottom:30px}
-.agents h3{font-size:1.05rem;margin-bottom:8px}
-.agents p{font-size:.88rem;color:#c6d4ee;margin-bottom:8px}
-.agent-chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 10px}
-.chip{background:rgba(46,166,255,.12);border:1px solid rgba(46,166,255,.35);color:#9fd0ff;border-radius:999px;padding:4px 14px;font-size:.8rem;font-weight:700}
-
-/* mock screens */
-.mock{background:#0a1428;border:1px solid var(--border);border-radius:16px;padding:18px;margin:16px 0}
-.mock .title{font-size:.78rem;color:var(--muted);text-align:center;margin-bottom:14px;letter-spacing:.5px}
-.tg-window{background:#17212b;border-radius:14px;padding:14px;max-width:420px;margin:0 auto}
-.tg-msg{background:var(--tg);color:#fff;border-radius:14px;padding:10px 14px;font-size:.85rem;max-width:85%;margin-bottom:10px;margin-inline-end:auto}
-.tg-msg.me{background:#2b5278;margin-inline-start:auto}
-.tg-btns{display:flex;flex-direction:column;gap:6px;max-width:85%;margin:12px auto 0}
-.tg-btn{background:#1d2a38;border:1px solid #2e4258;color:#c9dcf5;border-radius:10px;padding:8px;text-align:center;font-size:.82rem}
-.db-window{background:#101828;border-radius:14px;overflow:hidden;max-width:520px;margin:0 auto;font-size:.8rem;direction:ltr;text-align:left}
-.db-bar{background:#1a2436;padding:8px 14px;display:flex;gap:6px;align-items:center}
-.dot{width:11px;height:11px;border-radius:50%}
-.db-body{padding:16px;color:#8fa8c9}
-.k{color:#7dd3fc}.s{color:#a5f3a5}.n{color:#f0abfc}
-
-/* cards inside steps */
-.opt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:14px 0}
-.opt{background:var(--card2);border:1px solid var(--border);border-radius:14px;padding:16px}
-.opt h4{font-size:.95rem;margin-bottom:6px;display:flex;align-items:center;gap:8px}
-.opt p{font-size:.8rem;color:var(--muted);margin:0}
-.opt .rec{font-size:.68rem;background:rgba(46,204,113,.15);color:var(--ok);border-radius:99px;padding:2px 10px;margin-inline-start:auto}
-
-/* flow diagram */
-.flow{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:18px 0}
-.flow .node{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:10px 16px;font-size:.82rem}
-.flow .node.hl{border-color:var(--accent);background:rgba(46,166,255,.1)}
-.flow .arr{color:var(--accent);font-size:1.1rem}
-
-/* steps nav */
-.toc{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px 26px;margin-bottom:40px}
-.toc h3{font-size:1rem;margin-bottom:12px;color:#c6d4ee}
-.toc ol{padding-inline-start:20px;color:var(--muted);font-size:.9rem}
-.toc a{color:#c6d4ee}
-.toc a:hover{color:var(--accent)}
-
-footer{text-align:center;color:var(--muted);font-size:.82rem;padding:30px 0;border-top:1px solid var(--border);margin-top:50px}
-footer .links{margin-bottom:10px}
-
-@media(max-width:640px){
-  .step{padding:24px 18px}
-  .step h2{padding-inline-start:48px;font-size:1.05rem}
-  .step .time{margin-inline-start:48px}
-  pre{font-size:.75rem}
-  .lang-switch{top:8px;inset-inline-end:8px}
-}
-@media print{ .progress-box,.lang-switch{display:none} body{background:#fff;color:#000} }
-</style>
+  <style>
+    body {
+      background-color: #07090E;
+      color: #E2E8F0;
+      font-family: 'Vazirmatn', sans-serif;
+      overflow-x: hidden;
+    }
+    .mesh-gradient {
+      background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, rgba(36, 161, 222, 0.1) 40%, transparent 70%);
+    }
+    .glass {
+      background: rgba(22, 31, 54, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-hover:hover {
+      background: rgba(30, 41, 69, 0.85);
+      border-color: rgba(99, 102, 241, 0.35);
+      transform: translateY(-2px);
+      transition: all 0.25s ease;
+    }
+    .tg-post-bubble {
+      background: #182235;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px 16px 4px 16px;
+    }
+    .code-block {
+      direction: ltr;
+      text-align: left;
+      font-family: 'Fira Code', monospace;
+    }
+  </style>
 </head>
-<body>
+<body class="selection:bg-brand-500 selection:text-white">
 
-<!-- ============ LANG SWITCH ============ -->
-<div class="lang-switch" role="group" aria-label="Language">
-  <button type="button" data-setlang="fa" class="on" onclick="setLang('fa')">فارسی</button>
-  <button type="button" data-setlang="en" onclick="setLang('en')">English</button>
-</div>
-
-<!-- ============ HERO ============ -->
-<header class="hero">
-  <div class="badge-top">📰 NewsChannelBot · <span data-lang="fa">راهنمای نصب و فعال‌سازی</span><span data-lang="en">Setup & Activation Guide</span></div>
-  <h1><span data-lang="fa">راهنمای گام‌به‌گام پیاده‌سازی بات خبری تلگرام</span><span data-lang="en">Step-by-Step Guide: Telegram News Bot Setup</span></h1>
-  <p>
-    <span data-lang="fa">از صفر تا انتشار اولین پست خبری در کانال شما — ساخت بات در BotFather، دیتابیس Supabase، کلید هوش مصنوعی و استقرار دائمی روی Deployka. هر مرحله را که تمام کردید، تیک بزنید؛ پیشرفت شما ذخیره می‌شود.</span>
-    <span data-lang="en">From zero to your channel's first published post — create the bot on BotFather, set up the Supabase database, add an AI key, and deploy permanently on Deployka. Check off each step as you go; your progress is saved.</span>
-  </p>
-  <div class="hero-stats">
-    <div class="stat">⏱ <span data-lang="fa">زمان کل:</span><span data-lang="en">Total time:</span> <b>~30 min</b></div>
-    <div class="stat">🧩 <span data-lang="fa">مراحل:</span><span data-lang="en">Steps:</span> <b>7</b></div>
-    <div class="stat">💵 <span data-lang="fa">هزینه:</span><span data-lang="en">Cost:</span> <b><span data-lang="fa">رایگان تا ~۵$/ماه</span><span data-lang="en">free → ~$5/mo</span></b></div>
-    <div class="stat">💻 <span data-lang="fa">سطح:</span><span data-lang="en">Level:</span> <b><span data-lang="fa">مقدماتی</span><span data-lang="en">beginner</span></b></div>
-  </div>
-</header>
-
-<div class="wrap steps">
-
-  <!-- ============ PROGRESS ============ -->
-  <div class="progress-box">
-    <div class="progress-bar">
-      <span class="progress-label" id="plabel"></span>
-      <div class="progress-track"><div class="progress-fill" id="pfill"></div></div>
-      <button onclick="resetProgress()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:3px 10px;font-size:.72rem;cursor:pointer;font-family:inherit"><span data-lang="fa">شروع مجدد</span><span data-lang="en">Reset</span></button>
-    </div>
-  </div>
-
-  <!-- ============ AI AGENTS (NO-CODE PATH) ============ -->
-  <div class="agents">
-    <h3>🤖 <span data-lang="fa">مسیر بدون کدنویسی — کاری به CMD و ترمینال نداشته باشید</span><span data-lang="en">The no-code path — skip the terminal entirely</span></h3>
-    <p data-lang="fa">نمی‌خواهید خودتان دستور تایپ کنید؟ کافیست در <b>Supabase</b> و <b>Deployka</b> ثبت‌نام کنید (مرحله ۲ و ۷) و آدرس همین ریپو را به یک ایجنت هوش مصنوعی بدهید — بقیه کارها (کلون، نصب، ساخت فایل تنظیمات، رفع خطا) را ایجنت برایتان انجام می‌دهد و فقط می‌گوید چه چیزی را کجا وارد کنید:</p>
-    <p data-lang="en">Don't want to type commands yourself? Just sign up on <b>Supabase</b> and <b>Deployka</b> (steps 2 &amp; 7) and hand this repo's URL to an AI coding agent — it will clone, install, configure and debug everything for you, only asking you for the values to paste:</p>
-    <div class="agent-chips">
-      <span class="chip">🟣 Freebuff</span>
-      <span class="chip">🔷 OpenCode</span>
-      <span class="chip">🔶 Xiaomi MiMo AI</span>
-      <span class="chip"><span data-lang="fa">✨ هر AI Agent دیگر</span><span data-lang="en">✨ any other AI agent</span></span>
-    </div>
-    <p style="font-size:.8rem;color:var(--muted)">
-      <span data-lang="fa">💡 نمونه دستور آماده برای ایجنت: «این ریپو را کلون کن و برای اجرای NewsChannelBot آماده‌اش کن؛ من مقادیر BOT_TOKEN و SUPABASE_URL و SUPABASE_KEY و AI_KEYS را می‌دهم، تو .env را بساز، وابستگی‌ها را نصب کن و بات را اجرا کن.»</span>
-      <span data-lang="en">💡 Sample prompt for your agent: "Clone this repo and prepare NewsChannelBot to run; I'll provide BOT_TOKEN, SUPABASE_URL, SUPABASE_KEY and AI_KEYS — you create .env, install dependencies and start the bot."</span>
-    </p>
-  </div>
-
-  <!-- ============ TOC ============ -->
-  <nav class="toc">
-    <h3>🗺 <span data-lang="fa">فهرست مراحل</span><span data-lang="en">Steps overview</span></h3>
-    <ol>
-      <li><a href="#s1"><span data-lang="fa">ساخت بات در تلگرام (BotFather)</span><span data-lang="en">Create the bot on Telegram (BotFather)</span></a></li>
-      <li><a href="#s2"><span data-lang="fa">ساخت دیتابیس در Supabase</span><span data-lang="en">Create the database on Supabase</span></a></li>
-      <li><a href="#s3"><span data-lang="fa">اجرای جداول SQL</span><span data-lang="en">Run the SQL migrations</span></a></li>
-      <li><a href="#s4"><span data-lang="fa">گرفتن کلید هوش مصنوعی</span><span data-lang="en">Get an AI key</span></a></li>
-      <li><a href="#s5"><span data-lang="fa">نصب و اجرای بات</span><span data-lang="en">Install & run the bot</span></a></li>
-      <li><a href="#s6"><span data-lang="fa">اتصال کانال و انتشار اولین پست</span><span data-lang="en">Connect a channel & publish the first post</span></a></li>
-      <li><a href="#s7"><span data-lang="fa">استقرار دائمی (Deployka / VPS / Docker)</span><span data-lang="en">Permanent deployment (Deployka / VPS / Docker)</span></a></li>
-    </ol>
-  </nav>
-
-  <!-- ============ FLOW ============ -->
-  <div class="flow">
-    <div class="node">🤖 BotFather</div><div class="arr">←</div>
-    <div class="node">🗄 Supabase</div><div class="arr">←</div>
-    <div class="node">🧠 AI</div><div class="arr">←</div>
-    <div class="node">🚀 Deployka</div><div class="arr">←</div>
-    <div class="node hl">📡 <span data-lang="fa">کانال شما</span><span data-lang="en">Your channel</span></div>
-  </div>
-
-  <!-- ============ STEP 1 ============ -->
-  <section class="step" id="s1">
-    <h2><span data-lang="fa">ساخت بات در تلگرام (BotFather)</span><span data-lang="en">Create the bot on Telegram (BotFather)</span></h2>
-    <span class="time">⏱ <span data-lang="fa">۵ دقیقه</span><span data-lang="en">5 min</span></span>
-    <p>
-      <span data-lang="fa">بات‌های تلگرام همه از طریق ربات رسمی <b>BotFather</b> ساخته می‌شوند:</span>
-      <span data-lang="en">All Telegram bots are created through the official <b>BotFather</b> bot:</span>
-    </p>
-    <ol class="steplist" data-lang="fa">
-      <li>در تلگرام به <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> پیام بدهید</li>
-      <li>دستور <code>/newbot</code> را بفرستید</li>
-      <li>یک <b>نام نمایشی</b> برای بات انتخاب کنید (مثلاً «بات خبر من»)</li>
-      <li>یک <b>یوزرنیم یکتا</b> انتخاب کنید که حتماً به <code>bot</code> ختم شود (مثلاً <code>my_news_helper_bot</code>)</li>
-    </ol>
-    <ol class="steplist" data-lang="en">
-      <li>Message <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> on Telegram</li>
-      <li>Send the <code>/newbot</code> command</li>
-      <li>Pick a <b>display name</b> (e.g. "My News Bot")</li>
-      <li>Pick a unique <b>username</b> that must end in <code>bot</code> (e.g. <code>my_news_helper_bot</code>)</li>
-    </ol>
-
-    <div class="mock">
-      <div class="title"><span data-lang="fa">شبیه‌ساز گفتگو</span><span data-lang="en">Chat simulator</span></div>
-      <div class="tg-window">
-        <div class="tg-msg me">/newbot</div>
-        <div class="tg-msg">Alright, a new bot. How are we going to call it? Please send me the name.</div>
-        <div class="tg-msg me"><span data-lang="fa">بات خبر من</span><span data-lang="en">My News Bot</span></div>
-        <div class="tg-msg">Good. Now let's choose a username (must end in 'bot').</div>
-        <div class="tg-msg me">my_news_helper_bot</div>
-        <div class="tg-msg" style="background:#1d3a2c">Done! Use this token: <code style="background:#0e2417;color:#7ee2a8">7216…:AAF…</code><br>⚠️ <span data-lang="fa">توکن را کپی و در جای امن نگه دارید</span><span data-lang="en">Copy the token and keep it safe</span></div>
-      </div>
-    </div>
-
-    <div class="warn"><span class="i">⚠️</span><div>
-      <b><span data-lang="fa">توکن = کلید بات شما</span><span data-lang="en">The token = your bot's key</span></b>
-      <span data-lang="fa">هر کسی توکن را داشته باشد کنترل بات را دارد. آن را در گیت، اسکرین‌شات یا جایی عمومی منتشر نکنید. اگر لو رفت: BotFather → <code>/revoke</code></span>
-      <span data-lang="en">Anyone with the token controls your bot. Never publish it in git, screenshots or public places. If it leaks: BotFather → <code>/revoke</code></span>
-    </div></div>
-
-    <div class="tip"><span class="i">💡</span><div>
-      <b><span data-lang="fa">اختیاری ولی پیشنهادی</span><span data-lang="en">Optional but recommended</span></b>
-      <span data-lang="fa">دستورات بات را با <code>/setcommands</code> ثبت کنید. محتوای آماده در فایل <code>BOTCOMMANDS.txt</code> ریپو هست — کافیست محتوایش را برای BotFather بفرستید تا منوی دستورات کاربران فعال شود.</span>
-      <span data-lang="en">Register the bot commands via <code>/setcommands</code>. A ready-made list lives in <code>BOTCOMMANDS.txt</code> in the repo — just paste it to BotFather to enable the users' command menu.</span>
-    </div></div>
-
-    <label class="check"><input type="checkbox" data-step="1">
-      <span data-lang="fa">بات ساخته شد و توکن را دارم<span class="t">توکن شبیه 123456789:AAF3x… است</span></span>
-      <span data-lang="en">Bot created — I have the token<span class="t">It looks like 123456789:AAF3x…</span></span>
-    </label>
-  </section>
-
-  <!-- ============ STEP 2 ============ -->
-  <section class="step" id="s2">
-    <h2><span data-lang="fa">ساخت دیتابیس در Supabase</span><span data-lang="en">Create the database on Supabase</span></h2>
-    <span class="time">⏱ <span data-lang="fa">۵ دقیقه</span><span data-lang="en">5 min</span></span>
-    <p>
-      <span data-lang="fa">بات برای ذخیره کاربران، منابع خبری، مقالات و پیش‌نویس‌ها به یک دیتابیس Postgres نیاز دارد — سرویس رایگان <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a> کافی است:</span>
-      <span data-lang="en">The bot stores users, news sources, articles and drafts in a Postgres database — the free <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a> tier is enough:</span>
-    </p>
-    <ol class="steplist" data-lang="fa">
-      <li>به <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> بروید و با گیت‌هاب یا ایمیل ثبت‌نام کنید</li>
-      <li><b>New project</b> → نام دلخواه → رمز دیتابیس (لازم نیست جایی یادداشت کنید) → منطقه نزدیک به سرور اجرا (مثلاً Frankfurt)</li>
-      <li>بعد از آماده‌شدن پروژه: <b>Project Settings → API</b></li>
-      <li>دو مقدار را کپی کنید:
-        <ul style="padding-inline-start:20px;margin-top:6px">
-          <li><code>Project URL</code> → همان <code>SUPABASE_URL</code></li>
-          <li><code>service_role</code> secret → همان <code>SUPABASE_KEY</code> (دکمه Reveal را بزنید)</li>
-        </ul>
-      </li>
-    </ol>
-    <ol class="steplist" data-lang="en">
-      <li>Go to <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> and sign up with GitHub or email</li>
-      <li><b>New project</b> → pick a name → database password (no need to memorize) → a region close to your bot's server (e.g. Frankfurt)</li>
-      <li>Once ready: <b>Project Settings → API</b></li>
-      <li>Copy two values:
-        <ul style="padding-inline-start:20px;margin-top:6px">
-          <li><code>Project URL</code> → this is your <code>SUPABASE_URL</code></li>
-          <li><code>service_role</code> secret → this is your <code>SUPABASE_KEY</code> (click Reveal)</li>
-        </ul>
-      </li>
-    </ol>
-
-    <div class="mock">
-      <div class="title">Supabase — Settings → API</div>
-      <div class="db-window">
-        <div class="db-bar">
-          <span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span>
-          <span style="font-size:.7rem;color:#64748b;margin-left:8px">supabase.com/dashboard</span>
-        </div>
-        <div class="db-body">
-          <div><span class="k">Project URL</span> &nbsp;→&nbsp; <span class="s">https://xxxx.supabase.co</span></div>
-          <div style="margin-top:8px"><span class="k">service_role secret</span> &nbsp;→&nbsp; <span class="s">eyJhbGciOiJIUzI1NiIs…</span> <span class="n">[Reveal]</span></div>
-          <div style="margin-top:8px;color:#64748b">anon public → ❌ <span data-lang="fa">استفاده نکنید</span><span data-lang="en">do not use</span></div>
+  <!-- Navbar -->
+  <header class="sticky top-0 z-50 glass border-b border-surface-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <img src="assets/avatar.jpg" alt="NewsStudio Logo" class="w-11 h-11 rounded-xl shadow-lg border border-brand-500/30 object-cover" />
+        <div>
+          <span class="text-xl font-black tracking-tight text-white flex items-center gap-2">
+            NewsStudio <span class="text-xs px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30">2026</span>
+          </span>
+          <span class="text-xs text-slate-400 block -mt-0.5">استودیو خودکار و سرورلس تلگرام</span>
         </div>
       </div>
-    </div>
 
-    <div class="warn"><span class="i">⚠️</span><div>
-      <b><span data-lang="fa">حتماً کلید service_role — نه anon</span><span data-lang="en">Use the service_role key — not anon</span></b>
-      <span data-lang="fa">کلید service_role دسترسی کامل دارد و فقط باید سمت سرور (روی هاست بات) بماند؛ هرگز داخل گیت یا کد سمت کاربر قرار نگیرد.</span>
-      <span data-lang="en">The service_role key has full access and must stay server-side (on the bot host) only; never put it in git or client code.</span>
-    </div></div>
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+        <a href="#features" class="hover:text-brand-400 transition-colors">قابلیت‌ها</a>
+        <a href="#router" class="hover:text-brand-400 transition-colors">روتر استخر هوش مصنوعی</a>
+        <a href="#simulator" class="hover:text-brand-400 transition-colors">پیش‌نمایش تعاملی</a>
+        <a href="#setup" class="hover:text-brand-400 transition-colors">آموزش راه‌اندازی</a>
+      </nav>
 
-    <label class="check"><input type="checkbox" data-step="2">
-      <span data-lang="fa">پروژه Supabase ساخته شد و URL + کلید service_role را دارم</span>
-      <span data-lang="en">Supabase project created — I have the URL + service_role key</span>
-    </label>
-  </section>
-
-  <!-- ============ STEP 3 ============ -->
-  <section class="step" id="s3">
-    <h2><span data-lang="fa">اجرای جداول SQL</span><span data-lang="en">Run the SQL migrations</span></h2>
-    <span class="time">⏱ <span data-lang="fa">۳ دقیقه</span><span data-lang="en">3 min</span></span>
-    <p>
-      <span data-lang="fa">در پنل Supabase، از منوی چپ <b>SQL Editor → New query</b> را باز کنید و ۱۰ فایل پوشه <code>sql/</code> ریپو را <b>به‌ترتیب</b> اجرا کنید:</span>
-      <span data-lang="en">In the Supabase dashboard open <b>SQL Editor → New query</b> and run the 10 files from the repo's <code>sql/</code> folder <b>in order</b>:</span>
-    </p>
-
-    <div class="mock">
-      <div class="title"><span data-lang="fa">ترتیب اجرا در SQL Editor</span><span data-lang="en">Execution order in SQL Editor</span></div>
-      <div class="db-window">
-        <div class="db-bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span style="font-size:.7rem;color:#64748b;margin-left:8px">SQL Editor</span></div>
-        <div class="db-body">
-          <div><span class="n">01_init.sql</span> <span class="c"><span data-lang="fa">-- جداول اصلی: کاربران، منابع، مقالات، پیش‌نویس‌ها</span><span data-lang="en">-- core tables: users, sources, articles, drafts</span></span></div>
-          <div><span class="n">02_ai_images_footer.sql</span></div>
-          <div><span class="n">03_discussion_fulltext.sql</span></div>
-          <div><span class="n">04_digest.sql</span></div>
-          <div><span class="n">05_provider_keys.sql</span></div>
-          <div><span class="n">06_social_sources.sql</span></div>
-          <div><span class="n">07_filters.sql</span></div>
-          <div><span class="n">08_user_feedback.sql</span></div>
-          <div><span class="n">09_admin_notes.sql</span></div>
-          <div><span class="n">10_custom_providers.sql</span> <span class="s">✓</span></div>
-        </div>
+      <div class="flex items-center gap-3">
+        <a href="https://t.me/MyLeitner" target="_blank" class="hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold bg-telegram/15 text-telegram border border-telegram/30 hover:bg-telegram/25 transition-all">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/></svg>
+          کانال @MyLeitner
+        </a>
+        <a href="https://github.com/mohsen-niksirat/News-Channel-Bot" target="_blank" class="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-white border border-white/20 transition-all">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          گیت‌هاب پروژه
+        </a>
       </div>
     </div>
+  </header>
 
-    <p>
-      <span data-lang="fa">فایل‌ها را از <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/tree/main/sql" target="_blank" rel="noopener">پوشه sql در گیت‌هاب</a> باز کنید، محتوایشان را کپی و در SQL Editor پیست کنید و دکمه <b>Run</b> را بزنید — به‌ترتیب، یکی‌یکی.</span>
-      <span data-lang="en">Open the files from the <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/tree/main/sql" target="_blank" rel="noopener">sql folder on GitHub</a>, paste each one into the SQL Editor and press <b>Run</b> — in order, one by one.</span>
-    </p>
-    <div class="tip"><span class="i">💡</span><div>
-      <span data-lang="fa">اگر بعداً پیام خطای «column does not exist» دیدید، یعنی یکی از فایل‌ها اجرا نشده — همین لیست را دوباره چک کنید.</span>
-      <span data-lang="en">If you later see a "column does not exist" error, one file was skipped — re-check this list.</span>
-    </div></div>
+  <!-- Hero Section -->
+  <section class="relative pt-16 pb-24 mesh-gradient overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+      
+      <!-- Badges -->
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass border border-brand-500/30 text-xs text-brand-300 mb-8 animate-pulse">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        معماری انقلابی ۱۰۰٪ سرورلس روی تلگرام کلود (Telegram Cloud)
+      </div>
 
-    <label class="check"><input type="checkbox" data-step="3">
-      <span data-lang="fa">هر ۱۰ فایل SQL بدون خطا اجرا شد</span>
-      <span data-lang="en">All 10 SQL files ran without errors</span>
-    </label>
-  </section>
+      <h1 class="text-4xl sm:text-6xl font-black text-white tracking-tight leading-tight max-w-4xl mx-auto">
+        تحریریه خبری خودکار و هوشمند تلگرام با <span class="bg-gradient-to-r from-brand-400 via-telegram to-gemini bg-clip-text text-transparent">Gemini 3.1 & 9Router</span>
+      </h1>
 
-  <!-- ============ STEP 4 ============ -->
-  <section class="step" id="s4">
-    <h2><span data-lang="fa">گرفتن کلید هوش مصنوعی</span><span data-lang="en">Get an AI key</span></h2>
-    <span class="time">⏱ <span data-lang="fa">۵ دقیقه</span><span data-lang="en">5 min</span></span>
-    <p>
-      <span data-lang="fa">بات برای بازنویسی/ترجمه اخبار به پست فارسی، به یک مدل زبانی با رابط OpenAI-compatible نیاز دارد. فقط <b>یکی</b> از گزینه‌ها کافی است:</span>
-      <span data-lang="en">To rewrite/translate news into Persian posts, the bot needs an OpenAI-compatible LLM provider. Any <b>one</b> of these is enough:</span>
-    </p>
+      <p class="mt-6 text-lg sm:text-xl text-slate-300 max-w-3xl mx-auto font-light leading-relaxed">
+        پایش مستمر فیدهای خبری معتبر، بازنویسی هوشمند به زبان ژورنالی جذاب، مدیریت استخر نامحدود کلیدهای AI با سیستم ضداِسپم تجمیع بولتن‌های ساعتی — بدون نیاز به خرید سرور یا VPS!
+      </p>
 
-    <div class="opt-grid">
-      <div class="opt"><h4>🔵 DeepSeek <span class="rec"><span data-lang="fa">پیشنهادی</span><span data-lang="en">recommended</span></span></h4><p><span data-lang="fa">ثبت‌نام در platform.deepseek.com → ساخت API Key → شارژ حداقلی. مدل «deepseek-chat» فارسی خوبی می‌نویسد.</span><span data-lang="en">Sign up at platform.deepseek.com → create an API key → minimal top-up. The deepseek-chat model writes good Persian.</span></p></div>
-      <div class="opt"><h4>🟣 Dahl</h4><p><span data-lang="fa">اگر از سرویس‌های واسط استفاده می‌کنید: <code>AI_KEYS=dahl=…</code> و <code>DAHL_BASE_URL</code> را طبق .env.example تنظیم کنید.</span><span data-lang="en">If you use relay services: set <code>AI_KEYS=dahl=…</code> and <code>DAHL_BASE_URL</code> per .env.example.</span></p></div>
-      <div class="opt"><h4>⚙️ <span data-lang="fa">هر Provider سازگار</span><span data-lang="en">Any compatible provider</span></h4><p><span data-lang="fa">XKIRO، Inception، Vyce یا هر سرویس OpenAI-compatible دیگر — با زنجیره fallback پشتیبانی می‌شوند.</span><span data-lang="en">XKIRO, Inception, Vyce or any other OpenAI-compatible service — all supported via the fallback chain.</span></p></div>
+      <div class="mt-10 flex flex-wrap items-center justify-center gap-4">
+        <a href="#setup" class="px-8 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white shadow-lg shadow-brand-500/25 transition-all">
+          🚀 شروع سریع و آموزش راه‌اندازی
+        </a>
+        <a href="#simulator" class="px-8 py-3.5 rounded-xl font-bold text-sm glass glass-hover text-slate-200">
+          👀 شبیه‌ساز پست‌ها و بولتن خبری
+        </a>
+      </div>
+
+      <!-- Banner Preview Card -->
+      <div class="mt-16 max-w-5xl mx-auto glass rounded-2xl p-2.5 shadow-2xl border border-surface-border">
+        <img src="assets/banner.jpg" alt="NewsStudio Platform Overview" class="w-full rounded-xl object-cover shadow-inner" />
+      </div>
+
     </div>
-
-    <p>
-      <span data-lang="fa">کلید را در متغیر <code>AI_KEYS</code> می‌گذارید (چند کلید هم پشتیبانی می‌شود، جداکننده <code>;</code>):</span>
-      <span data-lang="en">Put the key in the <code>AI_KEYS</code> variable (multiple keys supported, separated by <code>;</code>):</span>
-    </p>
-    <pre><span class="c"># one key:</span>
-AI_KEYS=deepseek=sk-xxxxxxxx
-
-<span class="c"># multiple keys / providers (rotation + fallback):</span>
-AI_KEYS=deepseek=sk-aaa;dahl=sk-bbb</pre>
-
-    <div class="tip"><span class="i">💡</span><div>
-      <span data-lang="fa">اگر کلید هوش مصنوعی نداشته باشید بات اجرا می‌شود اما به‌جای پست AI، متن خام خبر را می‌فرستد. با دستور <code>/aicheck</code> داخل بات می‌توانید سلامت همه کلیدها را تست کنید.</span>
-      <span data-lang="en">Without an AI key the bot still runs but posts raw news text instead of AI-written posts. Use <code>/aicheck</code> inside the bot to test all keys.</span>
-    </div></div>
-
-    <label class="check"><input type="checkbox" data-step="4">
-      <span data-lang="fa">کلید AI را دارم (sk-…)</span>
-      <span data-lang="en">I have an AI key (sk-…)</span>
-    </label>
   </section>
 
-  <!-- ============ STEP 5 ============ -->
-  <section class="step" id="s5">
-    <h2><span data-lang="fa">نصب و اجرای بات</span><span data-lang="en">Install & run the bot</span></h2>
-    <span class="time">⏱ <span data-lang="fa">۵ دقیقه</span><span data-lang="en">5 min</span></span>
+  <!-- Interactive Simulator Section -->
+  <section id="simulator" class="py-20 border-t border-surface-border bg-surface/40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-14">
+        <h2 class="text-3xl font-black text-white">✨ پیش‌نمایش زنده خروجی در کانال تلگرام</h2>
+        <p class="mt-3 text-slate-400">ببینید هوش مصنوعی چگونه اخبار خام و فیدهای خبری را به پست‌های تحریریه یا بولتن‌های ساعتی تبدیل می‌کند:</p>
 
-    <div class="tip" style="margin-top:0"><span class="i">🤖</span><div>
-      <b><span data-lang="fa">ترمینال ندارید؟ به ایجنت بسپارید!</span><span data-lang="en">No terminal? Hand it to an agent!</span></b>
-      <span data-lang="fa">این مرحله و همه مراحل بعدی فنی را می‌توانید به ایجنت‌های هوشمند (Freebuff، OpenCode، Xiaomi MiMo AI و…) بسپارید: فقط آدرس ریپو و ۴ مقدار کلیدی را بدهید؛ کلون، نصب، ساخت <code>.env</code> و اجرا را خودشان انجام می‌دهند. شما فقط در Supabase و Deployka ثبت‌نام کنید (مرحله ۲ و ۷).</span>
-      <span data-lang="en">You can delegate this and every later technical step to AI agents (Freebuff, OpenCode, Xiaomi MiMo AI, …): just give them the repo URL and the 4 key values; they clone, install, create <code>.env</code> and run everything. You only sign up on Supabase and Deployka (steps 2 &amp; 7).</span>
-    </div></div>
-
-    <p>
-      <span data-lang="fa">نیازمندی‌ها: <b>Python 3.10+</b> و <b>git</b>. در ترمینال:</span>
-      <span data-lang="en">Requirements: <b>Python 3.10+</b> and <b>git</b>. In a terminal:</span>
-    </p>
-
-    <pre><span class="c"># 1) clone the project</span>
-git clone https://github.com/mohsen-niksirat/News-Channel-Bot.git
-cd News-Channel-Bot
-
-<span class="c"># 2) virtual env + dependencies</span>
-python -m venv .venv
-<span class="c"># Windows:</span>
-.venv\Scripts\activate
-<span class="c"># Linux/macOS:</span>
-source .venv/bin/activate
-
-pip install -r requirements.txt
-
-<span class="c"># 3) create the config file</span>
-cp .env.example .env</pre>
-
-    <p>
-      <span data-lang="fa">فایل <code>.env</code> را باز کنید و ۴ مقدار اجباری را پر کنید:</span>
-      <span data-lang="en">Open <code>.env</code> and fill in the 4 required values:</span>
-    </p>
-    <pre>BOT_TOKEN=<span class="s">BotFather token (step 1)</span>
-SUPABASE_URL=<span class="s">project URL (step 2)</span>
-SUPABASE_KEY=<span class="s">service_role key (step 2)</span>
-AI_KEYS=deepseek=<span class="s">AI key (step 4)</span></pre>
-
-    <div class="warn"><span class="i">⚠️</span><div>
-      <span data-lang="fa">فایل <code>.env</code> در <code>.gitignore</code> است و هرگز به گیت پوش نمی‌شود — پس می‌توانید با خیال راحت مقادیر واقعی را داخلش بنویسید.</span>
-      <span data-lang="en"><code>.env</code> is in <code>.gitignore</code> and never gets pushed to git — so it's safe to put real values inside it.</span>
-    </div></div>
-
-    <p>
-      <span data-lang="fa">اجرای تستی:</span>
-      <span data-lang="en">Test run:</span>
-    </p>
-    <pre>python main.py</pre>
-    <p>
-      <span data-lang="fa">اگر لاگ اتصال را دیدید، به بات در تلگرام <code>/start</code> بدهید — باید منوی فارسی جواب بدهد. ✋ فعلاً با <code>Ctrl+C</code> متوقفش کنید؛ در مرحله بعد کانال را وصل می‌کنیم.</span>
-      <span data-lang="en">If you see the connection log, send <code>/start</code> to the bot on Telegram — it should reply with the menu. ✋ Stop it with <code>Ctrl+C</code> for now; we'll connect the channel next.</span>
-    </p>
-
-    <label class="check"><input type="checkbox" data-step="5">
-      <span data-lang="fa">بات اجرا شد و به /start جواب داد</span>
-      <span data-lang="en">Bot runs and answers /start</span>
-    </label>
-  </section>
-
-  <!-- ============ STEP 6 ============ -->
-  <section class="step" id="s6">
-    <h2><span data-lang="fa">اتصال کانال و انتشار اولین پست</span><span data-lang="en">Connect a channel & publish the first post</span></h2>
-    <span class="time">⏱ <span data-lang="fa">۵ دقیقه</span><span data-lang="en">5 min</span></span>
-
-    <ol class="steplist" data-lang="fa">
-      <li>بات را به‌عنوان <b>ادمین کانال</b> اضافه کنید (دسترسی <b>«حذف پیام‌ها»</b> حتماً فعال باشد)</li>
-      <li>بات را دوباره اجرا کنید: <code>python main.py</code></li>
-      <li>در چت بات: <code>/channel</code> → آیدی کانال را بفرستید: <code>@mychannel</code></li>
-      <li><code>/auto off</code> → برای شروع، بررسی دستی (پیشنهادی)</li>
-      <li><code>/scan</code> → بات فیدها را می‌خواند و پیش‌نویس می‌سازد</li>
-      <li><code>/review</code> → پیش‌نویس‌ها را با دکمه‌ها بررسی کنید</li>
-    </ol>
-    <ol class="steplist" data-lang="en">
-      <li>Add the bot as a <b>channel admin</b> (make sure <b>Delete messages</b> permission is on)</li>
-      <li>Run the bot again: <code>python main.py</code></li>
-      <li>In the bot chat: <code>/channel</code> → send your channel: <code>@mychannel</code></li>
-      <li><code>/auto off</code> → start with manual review (recommended)</li>
-      <li><code>/scan</code> → the bot reads feeds and creates drafts</li>
-      <li><code>/review</code> → check drafts with the buttons</li>
-    </ol>
-
-    <div class="mock">
-      <div class="title"><span data-lang="fa">کارت بررسی پیش‌نویس</span><span data-lang="en">Draft review card</span></div>
-      <div class="tg-window">
-        <div class="tg-msg">📰 <b><span data-lang="fa">افزایش قیمت تراشه‌های حافظه در گزارش جدید</span><span data-lang="en">Memory chip prices rise, new report says</span></b><br><br><span data-lang="fa">طبق گزارش تازه، عرضه محدود NVMe باعث رشد قیمت‌ها شده است…</span><span data-lang="en">According to a new report, limited NVMe supply is pushing prices up…</span><br><br>🔗 <span data-lang="fa">منبع:</span><span data-lang="en">Source:</span> BBC Technology</div>
-        <div class="tg-btns">
-          <div class="tg-btn">✅ <span data-lang="fa">انتشار در کانال</span><span data-lang="en">Publish to channel</span></div>
-          <div class="tg-btn">🔁 <span data-lang="fa">تولید مجدد</span><span data-lang="en">Regenerate</span></div>
-          <div class="tg-btn">❌ <span data-lang="fa">رد کردن</span><span data-lang="en">Reject</span></div>
+        <!-- Toggle Switch -->
+        <div class="mt-6 inline-flex p-1.5 rounded-xl glass border border-surface-border">
+          <button id="btnTabSingle" onclick="switchTab('single')" class="px-6 py-2 rounded-lg text-xs font-bold transition-all bg-brand-500 text-white shadow">
+            📰 پست تحلیلی تکی (۱ یا ۲ خبر)
+          </button>
+          <button id="btnTabBulletin" onclick="switchTab('bulletin')" class="px-6 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white">
+            🗞️ بولتن تجمیعی ساعتی (۳+ خبر - ضداِسپم)
+          </button>
         </div>
       </div>
+
+      <!-- Simulator Device Frame -->
+      <div class="max-w-2xl mx-auto glass rounded-3xl p-6 sm:p-8 shadow-2xl border border-surface-border relative">
+        <div class="flex items-center justify-between pb-4 mb-4 border-b border-surface-border">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center font-bold text-white shadow">
+              📢
+            </div>
+            <div>
+              <h4 class="font-bold text-sm text-white">کانال رسمی اخبار فناوری (@MyLeitner)</h4>
+              <span class="text-xs text-emerald-400">● انتشار خودکار لحظه‌ای</span>
+            </div>
+          </div>
+          <span class="text-xs text-slate-400 font-mono">ساعت ۰۳:۳۰</span>
+        </div>
+
+        <!-- Single Post View -->
+        <div id="viewSingle" class="tg-post-bubble p-5 text-sm leading-relaxed text-slate-200">
+          <div class="text-amber-400 font-bold text-base mb-2">
+            🚀 جهش بی‌سابقه درآمد ابری مایکروسافت به مرز ۳۳ میلیارد دلار!
+          </div>
+          <p class="text-slate-300 mb-3 font-light">
+            مایکروسافت در آخرین گزارش مالی خود برای نخستین بار ارقام تفکیکی پلتفرم ابری Azure را فاش کرد؛ رشدی فراتر از پیش‌بینی وال‌استریت با اتکا به تقاضای انفجاری برای سرویس‌های هوش مصنوعی OpenAI.
+          </p>
+          <div class="bg-black/30 rounded-lg p-3 text-xs text-slate-400 space-y-1.5 mb-3 border-r-2 border-brand-500">
+            <div>🔹 سهم ۳۳.۲ میلیارد دلاری اَژور از درآمدهای سه‌ماهه پاییز</div>
+            <div>🔹 ثبت رشد ۳۳ درصدی سالانه در حوزه رایانش ابری مولد</div>
+            <div>🔹 تاثیر مستقیم قراردادهای تجاری و زیرساخت تراشه‌های انویدیا</div>
+          </div>
+          <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/5 font-mono">
+            <span>منبع: TechCrunch</span>
+            <span>📢 @MyLeitner</span>
+          </div>
+
+          <!-- Telegram Inline Button -->
+          <div class="mt-4">
+            <a href="#" class="block text-center py-2.5 px-4 rounded-lg bg-telegram/20 hover:bg-telegram/30 text-telegram border border-telegram/30 text-xs font-bold transition-all">
+              🌐 مطالعه متن کامل خبر در منبع اصلی
+            </a>
+          </div>
+        </div>
+
+        <!-- Bulletin Post View (Hidden by default) -->
+        <div id="viewBulletin" class="hidden tg-post-bubble p-5 text-sm leading-relaxed text-slate-200">
+          <div class="text-emerald-400 font-bold text-base mb-3 border-b border-white/10 pb-2 flex items-center gap-2">
+            <span>🗞️</span>
+            <span>گزیده مهم‌ترین اخبار ساعت (ساعت ۰۳:۳۰)</span>
+          </div>
+
+          <div class="space-y-4">
+            <div class="border-r-2 border-brand-500 pr-3">
+              <a href="#" class="font-bold text-white hover:text-brand-300 block text-sm">
+                🔹 سرمایه‌گذاری میلیاردی انویدیا برای شکستن گلوگاه تراشه‌های هوش مصنوعی
+              </a>
+              <p class="text-xs text-slate-400 mt-1">تیم سبز با تزریق میلیاردها دلار به خطوط تولید TSMC در حال برطرف کردن بحران کمبود پردازنده‌های گرافیکی بلک‌ول است.</p>
+            </div>
+
+            <div class="border-r-2 border-emerald-500 pr-3">
+              <a href="#" class="font-bold text-white hover:text-emerald-300 block text-sm">
+                🔹 کشف ششمین سیاره کوتوله منظومه شمسی توسط رصدخانه ورا روبین
+              </a>
+              <p class="text-xs text-slate-400 mt-1">اخترشناسان با بهره‌گیری از تصویربرداری با وضوح فوق‌العاده موفق به شناسایی جرمی جدید فراتر از مدار پلوتو شدند.</p>
+            </div>
+
+            <div class="border-r-2 border-amber-500 pr-3">
+              <a href="#" class="font-bold text-white hover:text-amber-300 block text-sm">
+                🔹 رونمایی مازراتی از شاهکار تک‌نسخه مسی در فستیوال سرعت
+              </a>
+              <p class="text-xs text-slate-400 mt-1">ابرخودروی سوپراسپرت جدید با بدنه تمام مس چکش‌کاری دستی توجه کلکسیونرهای برتر جهان را به خود جلب کرد.</p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs text-slate-400 pt-4 mt-4 border-t border-white/5 font-mono">
+            <span>۳ خبر تجمیع شده در یک پست</span>
+            <span>📢 @MyLeitner</span>
+          </div>
+
+          <div class="mt-4">
+            <a href="#" class="block text-center py-2.5 px-4 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all">
+              📖 مشاهده منابع و جزئیات تکمیلی اخبار
+            </a>
+          </div>
+        </div>
+
+      </div>
     </div>
-
-    <p>
-      <span data-lang="fa">بعد از تأیید با ✅، پست با <b>منبع و لینک</b> در کانال منتشر می‌شود. با <code>/published</code> می‌توانید هر پست منتشرشده را 🗑 حذف کنید. وقتی از کیفیت راضی شدید: <code>/auto on</code> تا انتشار خودکار شود.</span>
-      <span data-lang="en">After approving with ✅, the post is published with <b>source + link</b>. Use <code>/published</code> to 🗑 delete any published post. Once you're happy with quality: <code>/auto on</code> for automatic publishing.</span>
-    </p>
-
-    <div class="tip"><span class="i">💡</span><div>
-      <span data-lang="fa">دستورات مفید بعدی: <code>/sites</code> مدیریت منابع، <code>/filter</code> فیلتر کلمات، <code>/digest</code> پست جمع‌بندی، <code>/settings</code> پنل تنظیمات. لیست کامل: <code>/help</code></span>
-      <span data-lang="en">Useful next commands: <code>/sites</code> manage sources, <code>/filter</code> keyword filters, <code>/digest</code> round-up post, <code>/settings</code> settings panel. Full list: <code>/help</code></span>
-    </div></div>
-
-    <label class="check"><input type="checkbox" data-step="6">
-      <span data-lang="fa">اولین پست با منبع در کانال منتشر شد 🎉</span>
-      <span data-lang="en">First post with source is live in the channel 🎉</span>
-    </label>
   </section>
 
-  <!-- ============ STEP 7 ============ -->
-  <section class="step" id="s7">
-    <h2><span data-lang="fa">استقرار دائمی (Deployka / VPS / Docker)</span><span data-lang="en">Permanent deployment (Deployka / VPS / Docker)</span></h2>
-    <span class="time">⏱ <span data-lang="fa">۱۰ دقیقه</span><span data-lang="en">10 min</span></span>
-    <p>
-      <span data-lang="fa">بات با long polling کار می‌کند — نه پورت می‌خواهد نه دامنه؛ فقط باید پروسه‌اش <b>همیشه روشن</b> باشد. اجرای روی کامپیوتر شخصی دائمی نیست؛ یکی از این روش‌ها را انتخاب کنید:</span>
-      <span data-lang="en">The bot uses long polling — no inbound ports, no domain; the process just has to <b>stay alive</b>. A personal computer isn't always-on; pick one of these:</span>
-    </p>
+  <!-- Key Features Grid -->
+  <section id="features" class="py-24 border-t border-surface-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <h2 class="text-3xl sm:text-4xl font-black text-white">🚀 ۸ ویژگی استثنایی و صنعتی</h2>
+        <p class="mt-4 text-slate-400">تمام ابزارهای لازم برای راه‌اندازی و اتوماسیون کامل یک رسانه خبری مستقل در تلگرام:</p>
+      </div>
 
-    <div class="opt-grid">
-      <div class="opt"><h4>🚀 Deployka <span class="rec"><span data-lang="fa">پیشنهادی — همین راهنما با آن تست شده</span><span data-lang="en">recommended — tested here</span></span></h4>
-        <p><span data-lang="fa"><a href="https://deployka.dev/" target="_blank" rel="noopener">deployka.dev</a> — پنل ساده، بدون سرور. <b>نسخه رایگان ۱۲۸ مگابایت رم</b> می‌دهد که برای این بات کافی است. کافیست سرویس Python بسازید، ریپو را وصل کنید، ۴ متغیر محیطی را وارد کنید و Start Command را <code>python main.py</code> بگذارید.</span>
-        <span data-lang="en"><a href="https://deployka.dev/" target="_blank" rel="noopener">deployka.dev</a> — simple panel, no server. <b>The free tier gives 128 MB of RAM</b>, enough for this bot. Create a Python service, connect the repo, add the 4 env vars, and set Start Command to <code>python main.py</code>.</span></p></div>
-      <div class="opt"><h4>🖥 VPS + systemd <span class="rec"><span data-lang="fa">ارزان‌ترین</span><span data-lang="en">cheapest</span></span></h4>
-        <p><span data-lang="fa">سرور اوبونتو ~۵$ — سرویس systemd با ری‌استارت خودکار. راهنمای کامل:</span><span data-lang="en">Ubuntu VPS ~$5 — systemd service with auto-restart. Full guide:</span> <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/DEPLOY.md" target="_blank" rel="noopener">docs/DEPLOY.md</a></p></div>
-      <div class="opt"><h4>🐳 Docker / Railway</h4>
-        <p><span data-lang="fa">Docker با فایل‌های آماده: <code>docker compose up -d --build</code>. Railway: ریپو را وصل کنید و متغیرها را در تب Variables بگذارید.</span><span data-lang="en">Docker with ready-made files: <code>docker compose up -d --build</code>. Railway: connect the repo and set variables in the Variables tab.</span></p></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <!-- Card 1 -->
+        <div class="glass glass-hover p-6 rounded-2xl">
+          <div class="w-12 h-12 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center text-2xl mb-4">
+            ⚡
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">۱۰۰٪ سرورلس (Tgcloud)</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">اجرا مستقیم روی سرورهای ابری رسمی تلگرام بدون نیاز به VPS، داکر، تنظیم پورت یا پرداخت هزینه ماهانه سرور.</p>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="glass glass-hover p-6 rounded-2xl">
+          <div class="w-12 h-12 rounded-xl bg-gemini/20 text-gemini flex items-center justify-center text-2xl mb-4">
+            🧠
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">روتر چندپرووایدر (9Router)</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">پشتیبانی همزمان از کلیدهای جمینای، گروک، دیپ‌سیک و امکان افزودن هر سرور یا کاستوم پروایدر دلخواه با Base URL.</p>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="glass glass-hover p-6 rounded-2xl">
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl mb-4">
+            🧪
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">تست سلامت و مدل‌ها</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">تست آنلاین تاخیر (Latency)، احراز هویت کلیدها و کشف خودکار مدل‌های پرسرعت و رایگان همراه با قابلیت کپی نام مدل.</p>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="glass glass-hover p-6 rounded-2xl">
+          <div class="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-2xl mb-4">
+            🗞️
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">بولتن ضداِسپم تجمیعی</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">در صورت وجود ۳ خبر یا بیشتر در ساعت، ربات آن‌ها را در یک پست شیک با لینک مستقیم تجمیع می‌کند تا کانال شلوغ نشود.</p>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="glass glass-hover p-6 rounded-2xl">
+          <div class="w-12 h-12 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-2xl mb-4">
+            🔐
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">ایزولاسیون کامل حریم‌خصوصی</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">جداسازی کامل کلیدها به ازای هر کاربر با قابلیت جابجایی اولویت با دکمه‌های ⬆️ و ⬇️ درون کیبورد شیشه‌ای.</p>
+        </div>
+
+        <!-- Card 6 -->
+        <div class="glass glass-hover p-6 rounded-2xl">
+          <div class="w-12 h-12 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-2xl mb-4">
+            📊
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">تحلیل مصرف توکن‌ها</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">داشبورد جامع تفکیکی امروز، هفته و ماه به همراه میزان توکن‌های ورودی/خروجی و تفکیک پروایدرها با دستور /tokens.</p>
+        </div>
+
+        <!-- Card 7 -->
+        <div class="glass glass-hover p-6 rounded-2xl">
+          <div class="w-12 h-12 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-2xl mb-4">
+            📨
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">خلاصه‌ساز پیام‌های پی‌وی</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">امکان فوروارد کردن هر پیام طولانی یا لینک از کانال‌ها و گروه‌ها به پی‌وی ربات جهت تبدیل آنی به پست ژورنالی.</p>
+        </div>
+
+        <!-- Card 8 -->
+        <div class="glass glass-hover p-6 rounded-2xl">
+          <div class="w-12 h-12 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center text-2xl mb-4">
+            📑
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">صف بررسی و انتشار خودکار</h3>
+          <p class="text-xs text-slate-400 leading-relaxed">انتخاب حالت انتشار خودکار (Auto-Publish) مستقیم در کانال یا حالت دستی با صف پیش‌نویس جهت تایید و بازنویسی مجدد.</p>
+        </div>
+
+      </div>
     </div>
-
-    <p>
-      <span data-lang="fa">در Deployka فقط این ۴ متغیر را در بخش Environment وارد کنید:</span>
-      <span data-lang="en">On Deployka, enter just these 4 variables in the Environment section:</span>
-    </p>
-    <pre>BOT_TOKEN=<span class="s">(step 1)</span>
-SUPABASE_URL=<span class="s">(step 2)</span>
-SUPABASE_KEY=<span class="s">(step 2)</span>
-AI_KEYS=deepseek=<span class="s">(step 4)</span></pre>
-
-    <p>
-      <span data-lang="fa">نمونه سرویس systemd برای VPS (<code>/etc/systemd/system/newschannelbot.service</code>):</span>
-      <span data-lang="en">Sample systemd service for a VPS (<code>/etc/systemd/system/newschannelbot.service</code>):</span>
-    </p>
-    <pre>[Unit]
-Description=NewsChannelBot
-After=network-online.target
-
-[Service]
-User=newsbot
-WorkingDirectory=/opt/newschannelbot
-EnvironmentFile=/opt/newschannelbot/.env
-ExecStart=/opt/newschannelbot/.venv/bin/python main.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target</pre>
-    <pre>sudo systemctl enable --now newschannelbot
-journalctl -u newschannelbot -f   <span class="c"># live logs</span></pre>
-
-    <div class="tip"><span class="i">💡</span><div>
-      <span data-lang="fa">بعد از استقرار دائمی دیگر نیازی به کامپیوتر روشن نیست — بات ۲۴/۷ فیدها را اسکن و کانال را به‌روز نگه می‌دارد. مانیتورینگ: <code>/adminstats</code> و لاگ‌های پنل Deployka یا سرور. 🤖 نصب روی Deployka را هم می‌توانید به ایجنت هوش مصنوعی بسپارید.</span>
-      <span data-lang="en">After permanent deployment you don't need your PC on — the bot scans feeds and updates the channel 24/7. Monitoring: <code>/adminstats</code> plus the Deployka panel or server logs. 🤖 You can also delegate the Deployka setup to an AI agent.</span>
-    </div></div>
-
-    <label class="check"><input type="checkbox" data-step="7">
-      <span data-lang="fa">بات روی هاست دائمی (Deployka / VPS) اجرا می‌شود</span>
-      <span data-lang="en">Bot runs on a permanent host (Deployka / VPS)</span>
-    </label>
   </section>
 
-  <!-- ============ FINISH ============ -->
-  <div class="step" id="done" style="border-color:rgba(46,204,113,.45)">
-    <h2 style="padding-inline-start:56px"><span data-lang="fa">🎉 تبریک! بات شما فعال است</span><span data-lang="en">🎉 Congratulations — your bot is live!</span></h2>
-    <span class="time">⏱ <span data-lang="fa">تمام شد</span><span data-lang="en">done</span></span>
-    <p>
-      <span data-lang="fa">از این لحظه هر خبر تازه از منابع شما به پست فارسی تبدیل و (بسته به حالت) در کانال منتشر می‌شود. پیشنهادهای بعدی:</span>
-      <span data-lang="en">From now on, every fresh item from your sources becomes a Persian post and (depending on mode) is published to the channel. Next suggestions:</span>
-    </p>
-    <ul class="steplist">
-      <li><code>/fixsources</code> — <span data-lang="fa">اصلاح فیدهای خراب</span><span data-lang="en">fix broken feeds</span> · <code>/sourcescheck</code> — <span data-lang="fa">تست همه فیدها</span><span data-lang="en">test all feeds</span></li>
-      <li><code>/keys</code> / <code>/balance</code> — <span data-lang="fa">پایش کلیدهای AI از داخل بات</span><span data-lang="en">monitor AI keys from inside the bot</span></li>
-      <li><a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/WHERE_TO_CHANGE.md" target="_blank" rel="noopener">docs/WHERE_TO_CHANGE.md</a> — <span data-lang="fa">شخصی‌سازی پیام‌ها و رفتار بات</span><span data-lang="en">customizing messages & behavior</span></li>
-      <li><a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/DEPLOY.md" target="_blank" rel="noopener">docs/DEPLOY.md</a> — <span data-lang="fa">راهنمای کامل استقرار و عیب‌یابی</span><span data-lang="en">full deployment & troubleshooting guide</span></li>
-    </ul>
-  </div>
+  <!-- Setup Guide Section -->
+  <section id="setup" class="py-24 border-t border-surface-border bg-surface-light/40">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <span class="text-xs font-bold uppercase tracking-wider text-brand-400">راهنمای گام‌به‌گام</span>
+        <h2 class="text-3xl sm:text-4xl font-black text-white mt-2">🛠️ راه‌اندازی و استقرار در کمتر از ۵ دقیقه</h2>
+        <p class="mt-3 text-slate-400">تمام مراحل به سادگی چند دستور ترمینال و بدون دردسر کانفیگ سرور:</p>
+      </div>
 
-  <footer>
-    <div class="links">
-      <a href="https://github.com/mohsen-niksirat/News-Channel-Bot" target="_blank" rel="noopener">GitHub</a> ·
-      <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/README.md" target="_blank" rel="noopener">README</a> ·
-      <a href="https://github.com/mohsen-niksirat/News-Channel-Bot/blob/main/docs/DEPLOY.md" target="_blank" rel="noopener">Deploy Guide</a> ·
-      <a href="https://deployka.dev/" target="_blank" rel="noopener">Deployka</a>
+      <div class="space-y-8">
+
+        <!-- Step 1 -->
+        <div class="glass p-6 sm:p-8 rounded-2xl">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center font-black text-white text-sm">۱</span>
+            <h3 class="text-lg font-bold text-white">ساخت ربات در تلگرام با BotFather</h3>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            در تلگرام به <a href="https://t.me/BotFather" target="_blank" class="text-telegram underline">@BotFather</a> پیام دهید، دستور <code>/newbot</code> را ارسال کنید و توکن اختصاصی ربات خود را بردارید.
+          </p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="glass p-6 sm:p-8 rounded-2xl">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center font-black text-white text-sm">۲</span>
+            <h3 class="text-lg font-bold text-white">کلون مخزن و نصب وابستگی‌ها</h3>
+          </div>
+          <p class="text-xs text-slate-300 mb-3">کدهای پروژه را دانلود کرده و وارد پوشه پروژه شوید:</p>
+          <div class="bg-black/50 rounded-xl p-4 code-block text-xs text-emerald-400 border border-white/5">
+            git clone https://github.com/mohsen-niksirat/News-Channel-Bot.git<br/>
+            cd News-Channel-Bot<br/>
+            npm install
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="glass p-6 sm:p-8 rounded-2xl">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center font-black text-white text-sm">۳</span>
+            <h3 class="text-lg font-bold text-white">مهاجرت دیتابیس و ارسال به تلگرام کلود</h3>
+          </div>
+          <p class="text-xs text-slate-300 mb-3">جدول‌های دیتابیس SQLite را اعمال کرده و کدها را مستقیماً روی تلگرام کلود آپلود کنید:</p>
+          <div class="bg-black/50 rounded-xl p-4 code-block text-xs text-emerald-400 border border-white/5">
+            npx tgcloud migrate --safe<br/>
+            npx tgcloud push
+          </div>
+          <p class="text-xs text-slate-400 mt-3">ربات شما در کسری از ثانیه روی سرورهای تلگرام روشن و آماده پاسخگویی می‌شود!</p>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="glass p-6 sm:p-8 rounded-2xl">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center font-black text-white text-sm">۴</span>
+            <h3 class="text-lg font-bold text-white">تنظیم کران‌جاب ساعتی رایگان (cron-job.org)</h3>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed mb-3">
+            برای اجرای خودکار اسکنر در هر ۱ ساعت، وارد سایت رایگان <a href="https://cron-job.org" target="_blank" class="text-brand-400 underline">cron-job.org</a> شوید و یک وظیفه جدید به آدرس زیر با دوره ۱ ساعت ایجاد کنید:
+          </p>
+          <div class="bg-black/50 rounded-xl p-4 code-block text-xs text-amber-300 border border-white/5">
+            https://cloud.telegram.org/YOUR_APP_ID/endpoints/cron
+          </div>
+        </div>
+
+      </div>
     </div>
-    NewsChannelBot · MIT License
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-surface-border py-12 bg-surface">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+      <div class="flex items-center gap-3">
+        <img src="assets/avatar.jpg" alt="Logo" class="w-8 h-8 rounded-lg object-cover" />
+        <span class="text-sm font-bold text-white">NewsStudio 2026</span>
+        <span class="text-xs text-slate-500">· توسعه یافته با ❤️ توسط <a href="https://github.com/mohsen-niksirat" class="text-brand-400 hover:underline">محسن نیک‌سیرت</a></span>
+      </div>
+
+      <div class="flex items-center gap-6 text-xs text-slate-400">
+        <a href="https://github.com/mohsen-niksirat/News-Channel-Bot" class="hover:text-white transition-colors">مخزن گیت‌هاب</a>
+        <a href="https://t.me/MyLeitner" class="hover:text-white transition-colors">کانال تلگرام</a>
+        <a href="https://cloud.telegram.org" class="hover:text-white transition-colors">Telegram Cloud</a>
+        <span class="text-slate-600">مجوز MIT</span>
+      </div>
+    </div>
   </footer>
-</div>
 
-<script>
-/* ---------- safe localStorage (sandboxed iframes / private mode may throw) ---------- */
-function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
-function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
-function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+  <!-- Interactive Simulator Tab Script -->
+  <script>
+    function switchTab(type) {
+      const vSingle = document.getElementById('viewSingle');
+      const vBulletin = document.getElementById('viewBulletin');
+      const btnSingle = document.getElementById('btnTabSingle');
+      const btnBulletin = document.getElementById('btnTabBulletin');
 
-/* ---------- language switching ---------- */
-const TITLES = {
-  fa: 'NewsChannelBot — آموزش پیاده‌سازی گام‌به‌گام',
-  en: 'NewsChannelBot — Step-by-Step Setup Guide'
-};
+      if (type === 'single') {
+        vSingle.classList.remove('hidden');
+        vBulletin.classList.add('hidden');
+        btnSingle.className = 'px-6 py-2 rounded-lg text-xs font-bold transition-all bg-brand-500 text-white shadow';
+        btnBulletin.className = 'px-6 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white';
+      } else {
+        vSingle.classList.add('hidden');
+        vBulletin.classList.remove('hidden');
+        btnBulletin.className = 'px-6 py-2 rounded-lg text-xs font-bold transition-all bg-brand-500 text-white shadow';
+        btnSingle.className = 'px-6 py-2 rounded-lg text-xs font-bold transition-all text-slate-400 hover:text-white';
+      }
+    }
+  </script>
 
-function setLang(lang){
-  if(!TITLES[lang]) return;
-  document.documentElement.lang = lang;
-  document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
-  document.title = TITLES[lang];
-  lsSet('ncb_lang', lang);
-  document.querySelectorAll('.lang-switch button').forEach(b =>
-    b.classList.toggle('on', b.dataset.setlang === lang));
-  renderStepNums();
-  updateUI();
-}
-
-function initLang(){
-  const saved = lsGet('ncb_lang');
-  let browser = 'fa';
-  try{ browser = (navigator.language || 'fa').toLowerCase().startsWith('fa') ? 'fa' : 'en'; }catch(e){}
-  setLang(saved || browser);
-}
-
-/* ---------- progress tracking (localStorage) ---------- */
-const TOTAL = 7;
-const boxes = [...document.querySelectorAll('input[data-step]')];
-const steps = [...document.querySelectorAll('.step')];
-
-function loadState(){ try{ return JSON.parse(lsGet('ncb_tutorial')||'{}'); }catch(e){ return {}; } }
-function saveState(s){ lsSet('ncb_tutorial', JSON.stringify(s)); }
-
-const faDigits = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
-
-function updateUI(){
-  const state = loadState();
-  const lang = document.documentElement.lang || 'fa';
-  boxes.forEach(b => { b.checked = !!state[b.dataset.step]; });
-  steps.forEach(s => {
-    const b = s.querySelector('input[data-step]');
-    s.classList.toggle('done', !!(b && state[b.dataset.step]));
-  });
-  const done = Object.keys(state).filter(k => state[k]).length;
-  document.getElementById('pfill').style.width = (done/TOTAL*100) + '%';
-  const dn = lang==='fa' ? faDigits(done) : done;
-  const tt = lang==='fa' ? faDigits(TOTAL) : TOTAL;
-  document.getElementById('plabel').textContent =
-    lang==='fa'
-      ? dn + ' از ' + tt + ' مرحله' + (done===TOTAL ? ' — کامل ✅' : '')
-      : done + ' of ' + TOTAL + ' steps' + (done===TOTAL ? ' — complete ✅' : '');
-}
-
-boxes.forEach(b => b.addEventListener('change', () => {
-  const state = loadState();
-  if(b.checked){
-    const n = parseInt(b.dataset.step,10);
-    for(let i=1;i<=n;i++) state[i] = true;
-  } else {
-    delete state[b.dataset.step];
-  }
-  saveState(state);
-  updateUI();
-}));
-
-function resetProgress(){ lsDel('ncb_tutorial'); updateUI(); }
-
-/* ---------- explicit step numbers (bulletproof vs CSS counters) ---------- */
-
-function renderStepNums(){
-  const lang = document.documentElement.lang || 'fa';
-  document.querySelectorAll('.step-num').forEach(b => {
-    b.textContent = lang === 'fa' ? faDigits(b.dataset.n) : b.dataset.n;
-  });
-}
-
-(function buildStepBadges(){
-  let n = 0;
-  document.querySelectorAll('.step').forEach(el => {
-    const b = el.querySelector('input[data-step]');
-    if(!b) return;                             // final card: no number
-    n++;
-    const badge = document.createElement('div');
-    badge.className = 'step-num';
-    badge.dataset.n = String(n);
-    badge.style.cssText = 'position:absolute;top:-22px;inset-inline-start:24px;width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.25rem;color:#fff;box-shadow:0 6px 18px rgba(46,120,255,.35)';
-    el.appendChild(badge);
-  });
-})();
-
-initLang();
-</script>
 </body>
 </html>
