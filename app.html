@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>NewsStudio 2026 — داشبورد مینی‌اپ تلگرام</title>
+
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Fonts: Vazirmatn -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Vazirmatn', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+            },
+            tg: {
+              bg: 'var(--tg-theme-bg-color, #0c101b)',
+              card: 'var(--tg-theme-secondary-bg-color, #161e33)',
+              text: 'var(--tg-theme-text-color, #ffffff)',
+              hint: 'var(--tg-theme-hint-color, #8e9bb0)',
+              button: 'var(--tg-theme-button-color, #6366f1)',
+              buttonText: 'var(--tg-theme-button-text-color, #ffffff)',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #0b0f19);
+      --card: var(--tg-theme-secondary-bg-color, #151d30);
+      --text: var(--tg-theme-text-color, #f1f5f9);
+      --hint: var(--tg-theme-hint-color, #94a3b8);
+      --accent: #6366f1;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Vazirmatn', sans-serif;
+      touch-action: pan-y;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .glass-card {
+      background-color: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      backdrop-filter: blur(12px);
+    }
+    .tab-btn.active {
+      background-color: rgba(99, 102, 241, 0.2);
+      color: #818cf8;
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden text-sm">
+
+  <!-- Top App Bar -->
+  <header class="glass-card px-4 py-3 flex items-center justify-between border-b border-white/10 shrink-0 z-20">
+    <div class="flex items-center gap-2.5">
+      <img src="assets/avatar.jpg" alt="Logo" class="w-8 h-8 rounded-lg object-cover shadow" />
+      <div>
+        <div class="font-extrabold text-sm flex items-center gap-1.5 text-white">
+          <span>NewsStudio</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono">2026</span>
+        </div>
+        <div id="userHeaderSubtitle" class="text-[11px] text-slate-400">تحریریه هوشمند سرورلس</div>
+      </div>
+    </div>
+
+    <!-- Quick Status Badge -->
+    <div id="badgeAutoPub" onclick="toggleAutoPublish()" class="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-bold text-emerald-400 transition-all">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span id="txtAutoPub">انتشار خودکار 🚀</span>
+    </div>
+  </header>
+
+  <!-- Main Scrollable Content Area -->
+  <main class="flex-1 overflow-y-auto custom-scroll p-4 space-y-4 pb-24">
+
+    <!-- ==================== TAB 1: OVERVIEW & DASHBOARD ==================== -->
+    <div id="tabOverview" class="space-y-4">
+
+      <!-- Connected Channel Banner -->
+      <div class="glass-card rounded-2xl p-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center text-lg font-bold">
+            📢
+          </div>
+          <div>
+            <div class="text-[11px] text-slate-400">کانال متصل به ربات:</div>
+            <div id="dispChannelId" class="font-bold text-white font-mono text-sm">@aaaabbbccccccdd</div>
+          </div>
+        </div>
+        <button onclick="changeChannelPrompt()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-slate-200">
+          تغییر کانال
+        </button>
+      </div>
+
+      <!-- Quick Metrics Grid -->
+      <div class="grid grid-cols-2 gap-3">
+        <!-- Metric 1: AI Keys -->
+        <div class="glass-card rounded-2xl p-3.5">
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span>استخر کلیدهای AI</span>
+            <span>🔑</span>
+          </div>
+          <div id="statKeysCount" class="text-xl font-black text-white">۳ کلید</div>
+          <div id="statKeysHealth" class="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
+            <span>●</span> <span>۱۰۰٪ آماده و سالم</span>
+          </div>
+        </div>
+
+        <!-- Metric 2: Today Tokens -->
+        <div class="glass-card rounded-2xl p-3.5">
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span>مصرف توکن امروز</span>
+            <span>📊</span>
+          </div>
+          <div id="statTodayTokens" class="text-xl font-black text-indigo-300">۳,۴۸۰</div>
+          <div class="text-[10px] text-slate-400 mt-1">
+            <span>هزینه تقریب: ۰.۰۰ $</span>
+          </div>
+        </div>
+
+        <!-- Metric 3: Active Sources -->
+        <div class="glass-card rounded-2xl p-3.5">
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span>منابع خبری فعال</span>
+            <span>📡</span>
+          </div>
+          <div id="statSourcesCount" class="text-xl font-black text-white">۵ فید RSS</div>
+          <div class="text-[10px] text-slate-400 mt-1">Zoomit, TechCrunch, Verge...</div>
+        </div>
+
+        <!-- Metric 4: Router Policy -->
+        <div class="glass-card rounded-2xl p-3.5">
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span>استراتژی روتر</span>
+            <span>🔀</span>
+          </div>
+          <div id="statRouterPolicy" class="text-sm font-bold text-amber-300 truncate">فالبک اولویتی</div>
+          <div class="text-[10px] text-slate-400 mt-1">تغییر از تب کلیدها</div>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="glass-card rounded-2xl p-4 space-y-3">
+        <div class="font-bold text-xs text-slate-300 flex items-center gap-1.5">
+          <span>⚡</span>
+          <span>عملیات‌های فوری و زنده</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2.5">
+          <button onclick="triggerScanNow()" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/20 active:scale-95 transition-all">
+            <span>🔍</span>
+            <span>اسکن فوری منابع</span>
+          </button>
+          <button onclick="triggerHealthCheck()" class="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+            <span>🧪</span>
+            <span>تست سلامت کلیدها</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Token Chart / Summary -->
+      <div class="glass-card rounded-2xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <span class="font-bold text-xs text-slate-300">📈 نمودار تفکیک مصرف دوره‌ای</span>
+          <span class="text-[11px] text-slate-400 font-mono">۷ روز اخیر</span>
+        </div>
+        <div class="space-y-2">
+          <div>
+            <div class="flex justify-between text-xs text-slate-400 mb-1">
+              <span>Google Gemini (Flash-Lite)</span>
+              <span class="font-mono text-emerald-400">۸۵٪</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+              <div class="h-full bg-emerald-400 rounded-full" style="width: 85%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs text-slate-400 mb-1">
+              <span>Groq / Llama 3.3</span>
+              <span class="font-mono text-brand-400">۱۵٪</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+              <div class="h-full bg-brand-500 rounded-full" style="width: 15%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==================== TAB 2: AI KEYS & ROUTER ==================== -->
+    <div id="tabKeys" class="hidden space-y-4">
+
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-sm text-white">استخر کلیدهای هوش مصنوعی (۹روتر)</h3>
+          <p class="text-[11px] text-slate-400">با دکمه‌های ⬆️ و ⬇️ اولویت استفاده از کلیدها را تعیین کنید.</p>
+        </div>
+        <button onclick="openAddKeyModal()" class="px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs flex items-center gap-1 shadow">
+          <span>➕</span>
+          <span>افزودن کلید</span>
+        </button>
+      </div>
+
+      <!-- Keys Container -->
+      <div id="keysListContainer" class="space-y-2.5">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Policy Picker Card -->
+      <div class="glass-card rounded-2xl p-4 space-y-3">
+        <span class="font-bold text-xs text-slate-300 block">🔀 استراتژی مصرف و چرخش کلیدها:</span>
+        <div class="space-y-2 text-xs" id="policyRadioGroup">
+          <label class="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/10 cursor-pointer">
+            <div class="flex items-center gap-2">
+              <input type="radio" name="policy" value="fallback" checked onchange="saveRoutingPolicy('fallback')" class="accent-indigo-500" />
+              <span class="font-bold text-slate-200">🛡️ فالبک اولویتی (Fallback)</span>
+            </div>
+            <span class="text-[10px] text-slate-400">سوئیچ خودکار هنگام خطا</span>
+          </label>
+
+          <label class="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/10 cursor-pointer">
+            <div class="flex items-center gap-2">
+              <input type="radio" name="policy" value="round_robin" onchange="saveRoutingPolicy('round_robin')" class="accent-indigo-500" />
+              <span class="font-bold text-slate-200">🔄 راند رابین (Round-Robin)</span>
+            </div>
+            <span class="text-[10px] text-slate-400">توزیع مساوی بین کلیدها</span>
+          </label>
+
+          <label class="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/10 cursor-pointer">
+            <div class="flex items-center gap-2">
+              <input type="radio" name="policy" value="smart_router" onchange="saveRoutingPolicy('smart_router')" class="accent-indigo-500" />
+              <span class="font-bold text-slate-200">🧠 اسمارت روتر (Smart Router)</span>
+            </div>
+            <span class="text-[10px] text-slate-400">سالم‌ترین با کمترین شکست</span>
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==================== TAB 3: SOURCES ==================== -->
+    <div id="tabSources" class="hidden space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-sm text-white">مدیریت کانال‌ها و فیدهای خبری</h3>
+          <p class="text-[11px] text-slate-400">منابعی که ربات هر ساعت برای اخبار پایش می‌کند.</p>
+        </div>
+        <button onclick="openAddSourceModal()" class="px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs flex items-center gap-1 shadow">
+          <span>➕</span>
+          <span>منبع جدید</span>
+        </button>
+      </div>
+
+      <div id="sourcesListContainer" class="space-y-2.5">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- ==================== TAB 4: DRAFTS & REVIEWS ==================== -->
+    <div id="tabDrafts" class="hidden space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="font-bold text-sm text-white">صف پیش‌نویس‌های تولیدی</h3>
+          <p class="text-[11px] text-slate-400">پست‌های آماده شده توسط هوش مصنوعی قبل از انتشار.</p>
+        </div>
+      </div>
+
+      <div id="draftsListContainer" class="space-y-3">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Bottom Navigation Bar -->
+  <nav class="glass-card fixed bottom-0 left-0 right-0 h-16 border-t border-white/10 flex items-center justify-around px-2 z-30">
+    <button onclick="switchAppTab('overview')" id="navOverview" class="tab-btn active flex-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all">
+      <span class="text-base">📊</span>
+      <span class="text-[10px] font-bold">داشبورد</span>
+    </button>
+    <button onclick="switchAppTab('keys')" id="navKeys" class="tab-btn flex-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all text-slate-400">
+      <span class="text-base">🔑</span>
+      <span class="text-[10px] font-bold">کلیدها و AI</span>
+    </button>
+    <button onclick="switchAppTab('sources')" id="navSources" class="tab-btn flex-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all text-slate-400">
+      <span class="text-base">📡</span>
+      <span class="text-[10px] font-bold">منابع خبری</span>
+    </button>
+    <button onclick="switchAppTab('drafts')" id="navDrafts" class="tab-btn flex-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all text-slate-400">
+      <span class="text-base">📑</span>
+      <span class="text-[10px] font-bold">پیش‌نویس‌ها</span>
+    </button>
+  </nav>
+
+  <!-- Toast Notification Container -->
+  <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 glass-card px-4 py-2.5 rounded-2xl shadow-2xl border border-brand-500/40 text-xs font-bold text-white flex items-center gap-2 transform -translate-y-20 opacity-0 transition-all duration-300">
+    <span id="toastIcon">✅</span>
+    <span id="toastMsg">عملیات با موفقیت انجام شد</span>
+  </div>
+
+  <!-- Application Logic & Telegram Mini App SDK Handlers -->
+  <script>
+    // Initialize Telegram WebApp
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      tg.enableClosingConfirmation();
+    }
+
+    function haptic(type = 'light') {
+      try {
+        if (tg?.HapticFeedback) {
+          if (type === 'success' || type === 'error') {
+            tg.HapticFeedback.notificationOccurred(type);
+          } else {
+            tg.HapticFeedback.impactOccurred(type);
+          }
+        }
+      } catch {}
+    }
+
+    function showToast(msg, icon = '✅') {
+      haptic('success');
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      document.getElementById('toastIcon').innerText = icon;
+      toast.classList.remove('-translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('-translate-y-20', 'opacity-0');
+      }, 2500);
+    }
+
+    // App State
+    let appState = {
+      user: {
+        channelId: '@aaaabbbccccccdd',
+        autoPublish: true,
+        routingPolicy: 'fallback',
+      },
+      keys: [
+        { id: 1, provider: 'gemini', label: 'Gemini Flash-Lite #1', masked: 'AIzaSy...7e40', status: 'active', tokens: '14.2k' },
+        { id: 2, provider: 'gemini', label: 'Gemini Flash-Lite #2', masked: 'AIzaSy...9x12', status: 'active', tokens: '8.1k' },
+        { id: 3, provider: 'groq', label: 'Groq Llama 3.3', masked: 'gsk_...58a1', status: 'active', tokens: '4.5k' },
+      ],
+      sources: [
+        { id: 1, name: 'زومیت (فناوری)', type: 'rss', url: 'https://zoomit.ir/feed/', enabled: true },
+        { id: 2, name: 'تک‌کرانچ (TechCrunch)', type: 'rss', url: 'https://techcrunch.com/feed/', enabled: true },
+        { id: 3, name: 'ورج (The Verge)', type: 'rss', url: 'https://theverge.com/rss/index.xml', enabled: true },
+        { id: 4, name: 'گجت نیوز', type: 'rss', url: 'https://gadgetnews.net/feed/', enabled: true },
+      ],
+      drafts: [
+        { id: 101, title: 'شکستن گلوگاه تراشه‌های هوش مصنوعی توسط انویدیا', source: 'Zoomit', summary: 'انویدیا میلیاردها دلار به خطوط پیشرفته تزریق کرد تا ظرفیت بلک‌ول دو برابر شود.' },
+        { id: 102, title: 'کشف ششمین سیاره کوتوله با رصدخانه ورا روبین', source: 'The Verge', summary: 'اخترشناسان جرمی فراتر از پلوتو با ویژگی‌های منحصربه‌فرد کشف کردند.' }
+      ]
+    };
+
+    // Render Tab Switcher
+    function switchAppTab(tab) {
+      haptic('light');
+      ['overview', 'keys', 'sources', 'drafts'].forEach(t => {
+        const view = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+        const btn = document.getElementById('nav' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (t === tab) {
+          view.classList.remove('hidden');
+          btn.classList.add('active', 'text-brand-400');
+          btn.classList.remove('text-slate-400');
+        } else {
+          view.classList.add('hidden');
+          btn.classList.remove('active', 'text-brand-400');
+          btn.classList.add('text-slate-400');
+        }
+      });
+    }
+
+    // Toggle Auto Publish
+    function toggleAutoPublish() {
+      haptic('medium');
+      appState.user.autoPublish = !appState.user.autoPublish;
+      const badge = document.getElementById('badgeAutoPub');
+      const txt = document.getElementById('txtAutoPub');
+
+      if (appState.user.autoPublish) {
+        badge.className = 'cursor-pointer flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-bold text-emerald-400';
+        txt.innerText = 'انتشار خودکار 🚀';
+        showToast('حالت انتشار خودکار روشن شد');
+      } else {
+        badge.className = 'cursor-pointer flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-400';
+        txt.innerText = 'حالت دستی (پیش‌نویس) 📑';
+        showToast('حالت دستی (صف پیش‌نویس) فعال شد');
+      }
+
+      // Notify bot via sendData
+      if (tg?.sendData) {
+        tg.sendData(JSON.stringify({ action: 'toggle_autopub' }));
+      }
+    }
+
+    // Trigger Immediate Scan
+    function triggerScanNow() {
+      haptic('heavy');
+      showToast('دستور پایش فوری به ربات ارسال شد', '🔍');
+      if (tg?.sendData) {
+        tg.sendData(JSON.stringify({ action: 'trigger_scan' }));
+      }
+    }
+
+    // Trigger Key Health Check
+    function triggerHealthCheck() {
+      haptic('medium');
+      showToast('در حال ارزیابی سلامت کلیدها...', '🧪');
+      if (tg?.sendData) {
+        tg.sendData(JSON.stringify({ action: 'test_keys' }));
+      }
+    }
+
+    // Render Keys
+    function renderKeys() {
+      const container = document.getElementById('keysListContainer');
+      container.innerHTML = appState.keys.map((k, idx) => `
+        <div class="glass-card rounded-2xl p-3 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="w-2.5 h-2.5 rounded-full ${k.status === 'active' ? 'bg-emerald-400' : 'bg-amber-400'}"></span>
+            <div>
+              <div class="font-bold text-xs text-white flex items-center gap-1.5">
+                <span>#${idx + 1} ${k.label}</span>
+                <span class="text-[10px] text-slate-400 font-mono">(${k.tokens})</span>
+              </div>
+              <div class="text-[11px] font-mono text-slate-400">${k.masked}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="moveKey(${k.id}, 'up')" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-xs">⬆️</button>
+            <button onclick="moveKey(${k.id}, 'down')" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-xs">⬇️</button>
+            <button onclick="deleteKey(${k.id})" class="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center text-xs">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Move Key Priority
+    function moveKey(id, dir) {
+      haptic('light');
+      const idx = appState.keys.findIndex(k => k.id === id);
+      if (dir === 'up' && idx > 0) {
+        const tmp = appState.keys[idx];
+        appState.keys[idx] = appState.keys[idx - 1];
+        appState.keys[idx - 1] = tmp;
+      } else if (dir === 'down' && idx < appState.keys.length - 1) {
+        const tmp = appState.keys[idx];
+        appState.keys[idx] = appState.keys[idx + 1];
+        appState.keys[idx + 1] = tmp;
+      }
+      renderKeys();
+      showToast('اولویت کلید با موفقیت به‌روزرسانی شد');
+    }
+
+    function deleteKey(id) {
+      haptic('medium');
+      appState.keys = appState.keys.filter(k => k.id !== id);
+      renderKeys();
+      showToast('کلید از استخر حذف شد');
+    }
+
+    // Render Sources
+    function renderSources() {
+      const container = document.getElementById('sourcesListContainer');
+      container.innerHTML = appState.sources.map(s => `
+        <div class="glass-card rounded-2xl p-3 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="text-base">${s.type === 'telegram' ? '📢' : '🌐'}</span>
+            <div>
+              <div class="font-bold text-xs text-white">${s.name}</div>
+              <div class="text-[10px] text-slate-400 font-mono truncate max-w-[180px]">${s.url}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="toggleSource(${s.id})" class="px-2.5 py-1 rounded-lg text-xs font-bold ${s.enabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-700/50 text-slate-400'}">
+              ${s.enabled ? 'فعال' : 'غیرفعال'}
+            </button>
+            <button onclick="deleteSource(${s.id})" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center text-xs">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function toggleSource(id) {
+      haptic('light');
+      const s = appState.sources.find(x => x.id === id);
+      if (s) {
+        s.enabled = !s.enabled;
+        renderSources();
+        showToast(s.enabled ? 'منبع فعال شد' : 'منبع موقتاً غیرفعال شد');
+      }
+    }
+
+    function deleteSource(id) {
+      haptic('medium');
+      appState.sources = appState.sources.filter(x => x.id !== id);
+      renderSources();
+      showToast('منبع حذف شد');
+    }
+
+    // Render Drafts
+    function renderDrafts() {
+      const container = document.getElementById('draftsListContainer');
+      if (appState.drafts.length === 0) {
+        container.innerHTML = '<div class="glass-card rounded-2xl p-6 text-center text-slate-400 text-xs">صف پیش‌نویس خالی است. تمام خبرها منتشر شده‌اند.</div>';
+        return;
+      }
+      container.innerHTML = appState.drafts.map(d => `
+        <div class="glass-card rounded-2xl p-4 space-y-2">
+          <div class="flex items-center justify-between text-[11px] text-slate-400">
+            <span>منبع: ${d.source}</span>
+            <span class="text-emerald-400 font-bold">آماده انتشار</span>
+          </div>
+          <h4 class="font-bold text-xs text-white leading-snug">${d.title}</h4>
+          <p class="text-[11px] text-slate-300 font-light leading-relaxed">${d.summary}</p>
+          <div class="pt-2 flex items-center gap-2 border-t border-white/5">
+            <button onclick="publishDraft(${d.id})" class="flex-1 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs">✅ انتشار در کانال</button>
+            <button onclick="rejectDraft(${d.id})" class="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold">❌ رد</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function publishDraft(id) {
+      haptic('success');
+      appState.drafts = appState.drafts.filter(d => d.id !== id);
+      renderDrafts();
+      showToast('پست در کانال منتشر شد! 🚀');
+    }
+
+    function rejectDraft(id) {
+      haptic('light');
+      appState.drafts = appState.drafts.filter(d => d.id !== id);
+      renderDrafts();
+      showToast('پیش‌نویس رد شد');
+    }
+
+    function saveRoutingPolicy(pol) {
+      haptic('light');
+      appState.user.routingPolicy = pol;
+      const names = { fallback: 'فالبک اولویتی', round_robin: 'راند رابین', smart_router: 'اسمارت روتر' };
+      document.getElementById('statRouterPolicy').innerText = names[pol] || pol;
+      showToast('استراتژی با موفقیت تغییر کرد');
+    }
+
+    function changeChannelPrompt() {
+      haptic('light');
+      const newCh = prompt('آیدی کانال تلگرام را با @ وارد کنید:', appState.user.channelId);
+      if (newCh && newCh.trim()) {
+        appState.user.channelId = newCh.trim();
+        document.getElementById('dispChannelId').innerText = appState.user.channelId;
+        showToast('آیدی کانال ثبت شد');
+      }
+    }
+
+    function openAddKeyModal() {
+      haptic('light');
+      const key = prompt('کلید API خود (گوگل جمینای، گروک یا...) را وارد کنید:');
+      if (key && key.trim()) {
+        appState.keys.push({
+          id: Date.now(),
+          provider: key.startsWith('AIza') ? 'gemini' : 'groq',
+          label: 'کلید جدید',
+          masked: key.slice(0, 6) + '...' + key.slice(-4),
+          status: 'active',
+          tokens: '0k'
+        });
+        renderKeys();
+        showToast('کلید جدید به استخر اضافه شد');
+      }
+    }
+
+    function openAddSourceModal() {
+      haptic('light');
+      const url = prompt('آدرس فید RSS یا نام کانال را وارد کنید:');
+      if (url && url.trim()) {
+        appState.sources.push({
+          id: Date.now(),
+          name: 'منبع جدید',
+          type: url.includes('t.me') ? 'telegram' : 'rss',
+          url: url.trim(),
+          enabled: true
+        });
+        renderSources();
+        showToast('منبع خبری اضافه شد');
+      }
+    }
+
+    // Initial Render
+    renderKeys();
+    renderSources();
+    renderDrafts();
+
+    // Set user profile info if provided by Telegram WebApp
+    if (tg?.initDataUnsafe?.user) {
+      const u = tg.initDataUnsafe.user;
+      document.getElementById('userHeaderSubtitle').innerText = `${u.first_name || ''} (@${u.username || 'user'})`;
+    }
+  </script>
+
+</body>
+</html>

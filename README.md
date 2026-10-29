@@ -16,6 +16,7 @@
 <p align="center">
   <a href="#-فارسی">🇮🇷 <b>فارسی</b></a> ·
   <a href="#-english">🇬🇧 <b>English</b></a> ·
+  <a href="https://mohsen-niksirat.github.io/News-Channel-Bot/app.html">📱 <b>مینی‌اپ داشبورد تلگرام (Mini App)</b></a> ·
   <a href="https://mohsen-niksirat.github.io/News-Channel-Bot/">🌐 <b>مشاهده وب‌سایت و راهنما (Live Demo)</b></a>
 </p>
 

@@ -6,8 +6,12 @@ import { ROUTING_POLICIES } from 'lib/ai_router';
 
 export function mainMenuKeyboard(user) {
   const autoPubStatus = user.autoPublish ? 'روشن 🚀' : 'دستی 📑';
+  const miniAppUrl = 'https://mohsen-niksirat.github.io/News-Channel-Bot/app.html';
   return {
     inline_keyboard: [
+      [
+        { text: '📱 مینی‌اپ داشبورد پیشرفته (Mini App)', web_app: { url: miniAppUrl } },
+      ],
       [
         { text: '🔍 اسکن فوری منابع', callback_data: 'act:scan' },
         { text: '📑 صف بررسی پیش‌نویس‌ها', callback_data: 'm:review:0' },
@@ -29,8 +33,12 @@ export function mainMenuKeyboard(user) {
 }
 
 export function mainReplyKeyboard() {
+  const miniAppUrl = 'https://mohsen-niksirat.github.io/News-Channel-Bot/app.html';
   return {
     keyboard: [
+      [
+        { text: '📱 باز کردن مینی‌اپ داشبورد', web_app: { url: miniAppUrl } },
+      ],
       [
         { text: '🔍 اسکن فوری منابع' },
         { text: '📑 صف بررسی' },

@@ -42,6 +42,51 @@ export default async function (message) {
   const { user } = await getOrCreateUser(from);
   const text = (message.text || message.caption || '').trim();
 
+  // Handle Telegram Mini App Data sent via Telegram.WebApp.sendData(...)
+  if (message.web_app_data && message.web_app_data.data) {
+    try {
+      const payload = JSON.parse(message.web_app_data.data);
+      if (payload.action === 'trigger_scan') {
+        await api.sendMessage({
+          chat_id: chat.id,
+          text: '⏳ <b>درخواست پایش فوری از مینی‌اپ دریافت شد!</b>\nدر حال بررسی منابع و آماده‌سازی اخبار...',
+          parse_mode: 'HTML',
+        });
+        await runScanForUser(from.id, chat.id);
+        return;
+      }
+      if (payload.action === 'test_keys') {
+        await api.sendMessage({
+          chat_id: chat.id,
+          text: '⏳ <b>در حال تست سلامت کلیدها از مینی‌اپ...</b>',
+          parse_mode: 'HTML',
+        });
+        const rep = await runHealthCheckForUser(from.id);
+        await api.sendMessage({
+          chat_id: chat.id,
+          text: rep.html,
+          parse_mode: 'HTML',
+          reply_markup: healthCheckKeyboard(),
+        });
+        return;
+      }
+      if (payload.action === 'toggle_autopub') {
+        const nextState = user.autoPublish ? 0 : 1;
+        await updateUser(from.id, { autoPublish: nextState });
+        const label = nextState ? 'روشن (خودکار) 🚀' : 'دستی (صف پیش‌نویس) 📑';
+        await api.sendMessage({
+          chat_id: chat.id,
+          text: `✅ وضعیت انتشار خودکار از طریق مینی‌اپ روی <b>${label}</b> تنظیم شد.`,
+          parse_mode: 'HTML',
+          reply_markup: mainMenuKeyboard(await getUser(from.id)),
+        });
+        return;
+      }
+    } catch (e) {
+      console.warn('WebApp data error:', e.message);
+    }
+  }
+
   // 0. Universal Cancel
   if (text === '/cancel' || text === '❌ انصراف' || text === '❌ لغو') {
     await setUserState(from.id, 'idle');
