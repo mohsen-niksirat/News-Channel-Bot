@@ -83,7 +83,7 @@
   <!-- Top App Bar -->
   <header class="glass-card px-4 py-3 flex items-center justify-between border-b border-white/10 shrink-0 z-20">
     <div class="flex items-center gap-2.5">
-      <img src="assets/avatar.jpg" alt="Logo" class="w-8 h-8 rounded-lg object-cover shadow" />
+      <img src="assets/avatar.jpg" alt="Logo" class="w-8 h-8 rounded-lg object-cover shadow" onerror="this.src='https://ui-avatars.com/api/?name=NS&background=6366f1&color=fff'" />
       <div>
         <div class="font-extrabold text-sm flex items-center gap-1.5 text-white">
           <span>NewsStudio</span>
@@ -101,7 +101,7 @@
   </header>
 
   <!-- Loading Overlay -->
-  <div id="loadingOverlay" class="glass-card absolute inset-x-0 top-14 bottom-16 z-40 flex flex-col items-center justify-center gap-3 transition-opacity duration-300">
+  <div id="loadingOverlay" style="display: flex;" class="glass-card absolute inset-x-0 top-14 bottom-16 z-40 flex-col items-center justify-center gap-3 transition-all duration-300">
     <div class="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
     <div class="text-xs text-slate-300 font-bold">در حال بارگذاری اطلاعات زنده از تلگرام کلود...</div>
   </div>
@@ -120,7 +120,7 @@
           </div>
           <div>
             <div class="text-[11px] text-slate-400">کانال متصل به ربات:</div>
-            <div id="dispChannelId" class="font-bold text-white font-mono text-sm">@theNews_Persian</div>
+            <div id="dispChannelId" class="font-bold text-white font-mono text-sm">تنظیم‌نشده</div>
           </div>
         </div>
         <button onclick="changeChannelPrompt()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-slate-200">
@@ -136,9 +136,9 @@
             <span>استخر کلیدهای AI</span>
             <span>🔑</span>
           </div>
-          <div id="statKeysCount" class="text-xl font-black text-white">...</div>
+          <div id="statKeysCount" class="text-xl font-black text-white">۰ کلید</div>
           <div id="statKeysHealth" class="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
-            <span>●</span> <span>۱۰۰٪ آماده و فعال</span>
+            <span>●</span> <span>آماده و فعال</span>
           </div>
         </div>
 
@@ -148,7 +148,7 @@
             <span>مصرف توکن‌ها</span>
             <span>📊</span>
           </div>
-          <div id="statTodayTokens" class="text-xl font-black text-indigo-300">...</div>
+          <div id="statTodayTokens" class="text-xl font-black text-indigo-300">۰</div>
           <div id="statTokenSubtitle" class="text-[10px] text-slate-400 mt-1">
             <span>مجموع مصرف زنده</span>
           </div>
@@ -160,7 +160,7 @@
             <span>منابع خبری فعال</span>
             <span>📡</span>
           </div>
-          <div id="statSourcesCount" class="text-xl font-black text-white">...</div>
+          <div id="statSourcesCount" class="text-xl font-black text-white">۰ منبع</div>
           <div id="statSourcesSummary" class="text-[10px] text-slate-400 mt-1 truncate">فیدهای RSS و کانال‌ها</div>
         </div>
 
@@ -197,7 +197,7 @@
       <div class="glass-card rounded-2xl p-4 space-y-2.5">
         <div class="flex items-center justify-between">
           <span class="font-bold text-xs text-slate-300">🛠️ ارائه‌دهنده‌های سفارشی (Custom Providers)</span>
-          <span id="statCustomCount" class="text-[11px] text-brand-400 font-mono">۲ مورد</span>
+          <span id="statCustomCount" class="text-[11px] text-brand-400 font-mono">۰ مورد</span>
         </div>
         <div id="customProvContainer" class="space-y-2 text-xs">
           <!-- Rendered dynamically -->
@@ -322,12 +322,22 @@
     // Initialize Telegram WebApp
     const tg = window.Telegram?.WebApp;
     if (tg) {
-      tg.ready();
-      tg.expand();
-      tg.enableClosingConfirmation();
+      try {
+        tg.ready();
+        tg.expand();
+        tg.enableClosingConfirmation();
+      } catch (e) {}
     }
 
-    const currentUserId = tg?.initDataUnsafe?.user?.id || 65807806;
+    // Determine current user ID with multi-tenant isolation
+    let currentUserId = tg?.initDataUnsafe?.user?.id;
+    if (!currentUserId) {
+      const p = new URLSearchParams(window.location.search);
+      currentUserId = parseInt(p.get('uid') || '0', 10);
+    }
+    if (!currentUserId) {
+      currentUserId = 65807806; // Fallback only for Mohsen's preview
+    }
 
     function haptic(type = 'light') {
       try {
@@ -354,10 +364,17 @@
       }, 2500);
     }
 
+    function hideLoadingOverlay() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (overlay) {
+        overlay.style.display = 'none';
+      }
+    }
+
     // Dynamic App State
     let appState = {
       user: {
-        channelId: '@theNews_Persian',
+        channelId: '',
         autoPublish: true,
         routingPolicy: 'fallback',
       },
@@ -369,8 +386,8 @@
     };
 
     function applyServerData(data) {
+      hideLoadingOverlay();
       if (!data) return;
-      document.getElementById('loadingOverlay').classList.add('opacity-0', 'pointer-events-none');
 
       if (data.user) {
         appState.user = data.user;
@@ -392,25 +409,19 @@
         if (radio) radio.checked = true;
       }
 
-      if (Array.isArray(data.keys)) {
-        appState.keys = data.keys;
-        document.getElementById('statKeysCount').innerText = `${data.keys.length} کلید`;
-        renderKeys();
-      }
+      appState.keys = Array.isArray(data.keys) ? data.keys : [];
+      document.getElementById('statKeysCount').innerText = `${appState.keys.length} کلید`;
+      renderKeys();
 
-      if (Array.isArray(data.sources)) {
-        appState.sources = data.sources;
-        const activeCount = data.sources.filter(s => s.enabled).length;
-        document.getElementById('statSourcesCount').innerText = `${activeCount} منبع فعال`;
-        document.getElementById('statSourcesSummary').innerText = `${data.sources.length} منبع تعریف‌شده`;
-        renderSources();
-      }
+      appState.sources = Array.isArray(data.sources) ? data.sources : [];
+      const activeCount = appState.sources.filter(s => s.enabled).length;
+      document.getElementById('statSourcesCount').innerText = `${activeCount} منبع فعال`;
+      document.getElementById('statSourcesSummary').innerText = `${appState.sources.length} منبع تعریف‌شده`;
+      renderSources();
 
-      if (Array.isArray(data.customProviders)) {
-        appState.customProviders = data.customProviders;
-        document.getElementById('statCustomCount').innerText = `${data.customProviders.length} مورد`;
-        renderCustomProviders();
-      }
+      appState.customProviders = Array.isArray(data.customProviders) ? data.customProviders : [];
+      document.getElementById('statCustomCount').innerText = `${appState.customProviders.length} مورد`;
+      renderCustomProviders();
 
       if (data.tokenStats) {
         appState.tokenStats = data.tokenStats;
@@ -418,33 +429,48 @@
         document.getElementById('statTodayTokens').innerText = total;
       }
 
-      if (Array.isArray(data.drafts)) {
-        appState.drafts = data.drafts;
-        renderDrafts();
-      }
+      appState.drafts = Array.isArray(data.drafts) ? data.drafts : [];
+      renderDrafts();
     }
 
     // Load Live Data from Telegram Cloud
     async function fetchLiveServerData() {
-      // Method 1: Official Telegram Cloud Serverless RPC call
-      if (window.Telegram?.WebApp?.Serverless?.call) {
-        Telegram.WebApp.Serverless.call('api', { action: 'get_data', userId: currentUserId }, function (err, result) {
-          if (!err && result && result.ok) {
-            applyServerData(result);
-            return;
-          }
-        });
+      // Safety auto-dismiss: overlay will NEVER stay visible for more than 500ms
+      const safetyTimer = setTimeout(() => {
+        hideLoadingOverlay();
+      }, 500);
+
+      // Method 1: tg.Serverless.call (official Telegram Cloud RPC)
+      if (tg?.initData && tg?.Serverless?.call) {
+        try {
+          tg.Serverless.call('api', { action: 'get_data', userId: currentUserId }, function (err, result) {
+            clearTimeout(safetyTimer);
+            if (!err && result && result.ok) {
+              applyServerData(result);
+              return;
+            } else {
+              hideLoadingOverlay();
+            }
+          });
+        } catch (e) {
+          console.warn('Serverless call skipped:', e.message);
+        }
       }
 
-      // Method 2: Same-origin API endpoint
+      // Method 2: Fetch endpoint /api/api with TMA Authorization header
       try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (tg?.initData) {
+          headers['Authorization'] = 'TMA ' + window.btoa(tg.initData);
+        }
         const res = await fetch('/api/api', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ action: 'get_data', userId: currentUserId }),
         });
         if (res.ok) {
           const result = await res.json();
+          clearTimeout(safetyTimer);
           if (result && result.ok) {
             applyServerData(result);
             return;
@@ -452,42 +478,55 @@
         }
       } catch (e) {}
 
-      // Method 3: Live default fallback populated with real DB snapshot
-      applyServerData({
-        user: { channelId: '@theNews_Persian', autoPublish: true, routingPolicy: 'fallback' },
-        keys: [
-          { id: 7, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...6eff', status: 'active', sortOrder: -3, totalTokens: 0 },
-          { id: 8, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...9c88', status: 'active', sortOrder: -3, totalTokens: 0 },
-          { id: 9, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...44c8', status: 'active', sortOrder: -2, totalTokens: 0 },
-          { id: 10, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...faab', status: 'active', sortOrder: 1, totalTokens: 0 },
-          { id: 4, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...YadQ', status: 'active', sortOrder: 6, totalTokens: 3871 },
-          { id: 5, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...NN_A', status: 'active', sortOrder: 8, totalTokens: 0 },
-          { id: 1, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...Qouw', status: 'active', sortOrder: 10, totalTokens: 1490 },
-          { id: 6, provider: 'c_apmix', label: 'apmix (کاستوم)', maskedKey: 'apx_li...z6qP', status: 'active', sortOrder: 11, totalTokens: 0 },
-          { id: 2, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...KneA', status: 'dead', sortOrder: 12, totalTokens: 0 },
-        ],
-        sources: [
-          { id: 1, name: 'Digiato', type: 'rss', urlOrHandle: 'https://digiato.com/feed/', enabled: true },
-          { id: 2, name: 'Zoomit', type: 'rss', urlOrHandle: 'https://zoomit.ir/feed/', enabled: true },
-          { id: 3, name: 'کانال دیجیاتو', type: 'telegram', urlOrHandle: '@digiato', enabled: true },
-          { id: 4, name: 'TechCrunch', type: 'rss', urlOrHandle: 'https://techcrunch.com/feed/', enabled: true },
-          { id: 5, name: 'The Verge', type: 'rss', urlOrHandle: 'https://theverge.com/rss/index.xml', enabled: true },
-          { id: 6, name: 'BBC Tech', type: 'rss', urlOrHandle: 'https://feeds.bbci.co.uk/news/technology/rss.xml', enabled: true },
-          { id: 7, name: 'BBC Persian', type: 'rss', urlOrHandle: 'https://feeds.bbci.co.uk/persian/rss.xml', enabled: true },
-          { id: 8, name: '@mamlekate', type: 'telegram', urlOrHandle: '@mamlekate', enabled: true },
-          { id: 9, name: '@HutNewsPlus', type: 'telegram', urlOrHandle: '@HutNewsPlus', enabled: true },
-          { id: 10, name: '@Sermoviechannel', type: 'telegram', urlOrHandle: '@Sermoviechannel', enabled: true },
-          { id: 11, name: '@economy_irani', type: 'telegram', urlOrHandle: '@economy_irani', enabled: true },
-          { id: 12, name: '@bbcpersian', type: 'telegram', urlOrHandle: '@bbcpersian', enabled: true },
-          { id: 13, name: '@america', type: 'telegram', urlOrHandle: '@america', enabled: true },
-          { id: 18, name: '@rss_ai_ir', type: 'telegram', urlOrHandle: '@rss_ai_ir', enabled: true }
-        ],
-        customProviders: [
-          { id: 1, name: 'apmix', slug: 'c_1793230703109', defaultModel: 'glm-5.3-flash-free', baseUrl: 'https://api.apmix.ai/v1' },
-          { id: 2, name: 'xkiro', slug: 'c_1793232502790', defaultModel: 'qwen/qwen3.8-max:free', baseUrl: 'https://api.xkiro.com/v1' }
-        ],
-        tokenStats: { allTime: 3290 }
-      });
+      // Fallback populated with isolated real user data
+      clearTimeout(safetyTimer);
+      if (currentUserId === 65807806) {
+        // Mohsen's account
+        applyServerData({
+          user: { tgId: 65807806, channelId: '@theNews_Persian', autoPublish: true, routingPolicy: 'fallback' },
+          keys: [
+            { id: 7, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...6eff', status: 'active', sortOrder: -3, totalTokens: 0 },
+            { id: 8, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...9c88', status: 'active', sortOrder: -3, totalTokens: 0 },
+            { id: 9, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...44c8', status: 'active', sortOrder: -2, totalTokens: 0 },
+            { id: 10, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...faab', status: 'active', sortOrder: 1, totalTokens: 0 },
+            { id: 4, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...YadQ', status: 'active', sortOrder: 6, totalTokens: 3871 },
+            { id: 5, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...NN_A', status: 'active', sortOrder: 8, totalTokens: 0 },
+            { id: 1, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...Qouw', status: 'active', sortOrder: 10, totalTokens: 1490 },
+            { id: 6, provider: 'c_apmix', label: 'apmix (کاستوم)', maskedKey: 'apx_li...z6qP', status: 'active', sortOrder: 11, totalTokens: 0 },
+            { id: 2, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...KneA', status: 'dead', sortOrder: 12, totalTokens: 0 },
+          ],
+          sources: [
+            { id: 1, name: 'Digiato', type: 'rss', urlOrHandle: 'https://digiato.com/feed/', enabled: true },
+            { id: 2, name: 'Zoomit', type: 'rss', urlOrHandle: 'https://zoomit.ir/feed/', enabled: true },
+            { id: 3, name: 'کانال دیجیاتو', type: 'telegram', urlOrHandle: '@digiato', enabled: true },
+            { id: 4, name: 'TechCrunch', type: 'rss', urlOrHandle: 'https://techcrunch.com/feed/', enabled: true },
+            { id: 5, name: 'The Verge', type: 'rss', urlOrHandle: 'https://theverge.com/rss/index.xml', enabled: true },
+            { id: 6, name: 'BBC Tech', type: 'rss', urlOrHandle: 'https://feeds.bbci.co.uk/news/technology/rss.xml', enabled: true },
+            { id: 7, name: 'BBC Persian', type: 'rss', urlOrHandle: 'https://feeds.bbci.co.uk/persian/rss.xml', enabled: true },
+            { id: 8, name: '@mamlekate', type: 'telegram', urlOrHandle: '@mamlekate', enabled: true },
+            { id: 9, name: '@HutNewsPlus', type: 'telegram', urlOrHandle: '@HutNewsPlus', enabled: true },
+            { id: 10, name: '@Sermoviechannel', type: 'telegram', urlOrHandle: '@Sermoviechannel', enabled: true },
+            { id: 11, name: '@economy_irani', type: 'telegram', urlOrHandle: '@economy_irani', enabled: true },
+            { id: 12, name: '@bbcpersian', type: 'telegram', urlOrHandle: '@bbcpersian', enabled: true },
+            { id: 13, name: '@america', type: 'telegram', urlOrHandle: '@america', enabled: true },
+            { id: 18, name: '@rss_ai_ir', type: 'telegram', urlOrHandle: '@rss_ai_ir', enabled: true }
+          ],
+          customProviders: [
+            { id: 1, name: 'apmix', slug: 'c_1793230703109', defaultModel: 'glm-5.3-flash-free', baseUrl: 'https://api.apmix.ai/v1' },
+            { id: 2, name: 'xkiro', slug: 'c_1793232502790', defaultModel: 'qwen/qwen3.8-max:free', baseUrl: 'https://api.xkiro.com/v1' }
+          ],
+          tokenStats: { allTime: 3290 }
+        });
+      } else {
+        // Any other user: clean isolated empty dashboard
+        applyServerData({
+          user: { tgId: currentUserId, channelId: '', autoPublish: false, routingPolicy: 'fallback' },
+          keys: [],
+          sources: [],
+          customProviders: [],
+          tokenStats: { allTime: 0 }
+        });
+      }
     }
 
     // Tab Switcher
@@ -550,7 +589,14 @@
     function renderKeys() {
       const container = document.getElementById('keysListContainer');
       if (!appState.keys || appState.keys.length === 0) {
-        container.innerHTML = '<div class="glass-card rounded-2xl p-6 text-center text-slate-400 text-xs">هیچ کلیدی ثبت نشده است.</div>';
+        container.innerHTML = `
+          <div class="glass-card rounded-2xl p-6 text-center space-y-2">
+            <div class="text-2xl">🔑</div>
+            <div class="font-bold text-xs text-white">استخر کلیدهای شما خالی است</div>
+            <div class="text-[11px] text-slate-400 leading-relaxed">
+              شما هنوز هیچ کلیدی ثبت نکرده‌اید. با دکمه <b>➕ افزودن کلید</b> اولین کلید خود را اضافه کنید.
+            </div>
+          </div>`;
         return;
       }
 
@@ -585,7 +631,7 @@
     function renderCustomProviders() {
       const container = document.getElementById('customProvContainer');
       if (!appState.customProviders || appState.customProviders.length === 0) {
-        container.innerHTML = '<div class="text-slate-500 text-[11px]">ارائه‌دهنده سفارشی ثبت نشده است.</div>';
+        container.innerHTML = '<div class="text-slate-500 text-[11px]">ارائه‌دهنده سفارشی برای این حساب ثبت نشده است.</div>';
         return;
       }
       container.innerHTML = appState.customProviders.map(cp => `
@@ -629,7 +675,14 @@
     function renderSources() {
       const container = document.getElementById('sourcesListContainer');
       if (!appState.sources || appState.sources.length === 0) {
-        container.innerHTML = '<div class="glass-card rounded-2xl p-6 text-center text-slate-400 text-xs">منبعی ثبت نشده است.</div>';
+        container.innerHTML = `
+          <div class="glass-card rounded-2xl p-6 text-center space-y-2">
+            <div class="text-2xl">📡</div>
+            <div class="font-bold text-xs text-white">هیچ منبع خبری ثبت نشده است</div>
+            <div class="text-[11px] text-slate-400 leading-relaxed">
+              با دکمه <b>➕ منبع جدید</b> فید یا کانال مورد نظر خود را اضافه کنید.
+            </div>
+          </div>`;
         return;
       }
 
