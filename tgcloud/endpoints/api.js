@@ -11,6 +11,7 @@ import {
   getUserSources,
   getAiKeys,
   getCustomProviders,
+  deleteCustomProvider,
   getTokenUsageStats,
   getDraftPosts,
   updateUser,
@@ -166,6 +167,15 @@ export default async function (input, ctx) {
     if (sourceId) {
       const toggled = await toggleSource(sourceId, userId);
       return { ok: true, enabled: toggled?.enabled };
+    }
+  }
+
+  // 8. Delete Custom Provider
+  if (action === 'delete_custom_provider' || action === 'delete_provider') {
+    const provId = parseInt(input.providerId || input.id, 10);
+    if (provId) {
+      await deleteCustomProvider(provId, userId);
+      return { ok: true, message: 'Custom provider deleted' };
     }
   }
 

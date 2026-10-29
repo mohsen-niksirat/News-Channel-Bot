@@ -6,7 +6,7 @@ import { ROUTING_POLICIES } from 'lib/ai_router';
 
 export function mainMenuKeyboard(user) {
   const autoPubStatus = user.autoPublish ? 'روشن 🚀' : 'دستی 📑';
-  const miniAppUrl = 'https://app9260009899.tgcloud.ai/';
+  const miniAppUrl = 'https://app9260009899.tgcloud.ai/?uid=' + (user?.tgId || '');
   return {
     inline_keyboard: [
       [
@@ -32,8 +32,8 @@ export function mainMenuKeyboard(user) {
   };
 }
 
-export function mainReplyKeyboard() {
-  const miniAppUrl = 'https://app9260009899.tgcloud.ai/';
+export function mainReplyKeyboard(userId = null) {
+  const miniAppUrl = 'https://app9260009899.tgcloud.ai/' + (userId ? `?uid=${userId}` : '');
   return {
     keyboard: [
       [
@@ -128,6 +128,19 @@ export function aiSettingsKeyboard(user, keysList, customProvidersList = []) {
   keyboard.push([
     { text: '🧪 تست سلامت کلیدها و مدل‌های فعال', callback_data: 'act:test_keys' },
   ]);
+
+  // Custom Providers with Delete Option
+  if (customProvidersList && customProvidersList.length > 0) {
+    keyboard.push([
+      { text: '─── 🛠️ ارائه‌دهنده‌های کاستوم ───', callback_data: 'noop' },
+    ]);
+    customProvidersList.forEach((cp) => {
+      keyboard.push([
+        { text: `🛠️ ${cp.name} (${cp.defaultModel || 'default'})`, callback_data: `info:prov:${cp.id}` },
+        { text: '🗑️ حذف', callback_data: `del:prov:${cp.id}` },
+      ]);
+    });
+  }
 
   keyboard.push([
     { text: '🌐 افزودن ارائه‌دهنده جدید (کاستوم / دلخواه)', callback_data: 'act:add_custom_prov' },

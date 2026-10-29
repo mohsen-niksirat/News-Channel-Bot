@@ -710,11 +710,24 @@
               <span>🛠️ ${cp.name}</span>
               <span class="text-[10px] text-emerald-400 font-mono">(${cp.defaultModel || 'default'})</span>
             </div>
-            <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[200px]">${cp.baseUrl}</div>
+            <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[190px]">${cp.baseUrl}</div>
           </div>
-          <span class="text-[10px] px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300">فعال</span>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300">فعال</span>
+            <button onclick="deleteCustomProvider(${cp.id})" class="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center text-xs transition-all" title="حذف ارائه‌دهنده">🗑️</button>
+          </div>
         </div>
       `).join('');
+    }
+
+    function deleteCustomProvider(id) {
+      haptic('medium');
+      if (!confirm('آیا از حذف این ارائه‌دهنده سفارشی و کلیدهای متصل به آن اطمینان دارید؟')) return;
+      appState.customProviders = appState.customProviders.filter(cp => cp.id !== id);
+      renderCustomProviders();
+      callServerless('delete_custom_provider', { providerId: id });
+      showToast('ارائه‌دهنده سفارشی حذف شد', '🗑️');
+      fetchLiveServerData();
     }
 
     function moveKey(id, dir) {

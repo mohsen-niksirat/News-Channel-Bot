@@ -362,11 +362,37 @@ export default async function (query) {
     const provId = parseInt(data.replace('del:prov:', ''), 10);
     await deleteCustomProvider(provId, from.id);
     const cpList = await getCustomProviders(from.id);
-    await api.sendMessage({
-      chat_id: chatId,
-      text: '🗑️ ارائه‌دهنده سفارشی و کلیدهای متصل به آن حذف شدند.',
-      reply_markup: providerSelectionKeyboard(cpList),
-    });
+    const keysList = await getAiKeys(from.id);
+    const updatedUser = await getUser(from.id);
+
+    try {
+      await api.editMessageText({
+        chat_id: chatId,
+        message_id: messageId,
+        text: '🗑️ <b>ارائه‌دهنده سفارشی و تمامی کلیدهای متصل به آن با موفقیت حذف شدند.</b>\n\nتنظیمات به‌روزرسانی شد:',
+        parse_mode: 'HTML',
+        reply_markup: aiSettingsKeyboard(updatedUser, keysList, cpList),
+      });
+    } catch {
+      await api.sendMessage({
+        chat_id: chatId,
+        text: '🗑️ <b>ارائه‌دهنده سفارشی و تمامی کلیدهای متصل به آن با موفقیت حذف شدند.</b>',
+        parse_mode: 'HTML',
+        reply_markup: aiSettingsKeyboard(updatedUser, keysList, cpList),
+      });
+    }
+    return;
+  }
+
+  // Info Custom Provider Tap
+  if (data.startsWith('info:prov:')) {
+    try {
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: 'برای حذف روی دکمه سطل زباله کنار آن ضربه بزنید.',
+        show_alert: false,
+      });
+    } catch {}
     return;
   }
 
