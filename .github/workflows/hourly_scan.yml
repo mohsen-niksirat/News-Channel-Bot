@@ -1,0 +1,33 @@
+name: Hourly News Scan & Publish
+
+on:
+  schedule:
+    # Runs automatically at the start of every hour (24 times a day, UTC)
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allows manual one-click trigger from GitHub Actions tab
+
+jobs:
+  hourly-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Configure tgcloud credentials & Run Cron
+        env:
+          TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_TOKEN }}
+        run: |
+          mkdir -p .tgcloud
+          if [ -n "$TGCLOUD_TOKEN" ]; then
+            echo "{\"token\":\"$TGCLOUD_TOKEN\"}" > .tgcloud/credentials
+          else
+            echo "Warning: TGCLOUD_TOKEN secret is not set yet. Please add it in GitHub Repository Settings -> Secrets and variables -> Actions."
+          fi
+          npx @tgcloud/cli run tgcloud/endpoints/cron "{}"

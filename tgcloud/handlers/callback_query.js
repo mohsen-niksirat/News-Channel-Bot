@@ -1,4 +1,4 @@
-import { api } from 'sdk';
+import { api, db } from 'sdk';
 import {
   getOrCreateUser,
   getUser,
@@ -32,6 +32,7 @@ import {
   routingPolicyKeyboard,
   keyProviderPickerKeyboard,
   channelSettingsKeyboard,
+  publishModeKeyboard,
   healthCheckKeyboard,
   backToMenuKeyboard,
 } from 'lib/keyboards';
@@ -80,13 +81,132 @@ export default async function (query) {
     return;
   }
 
-  // 2. Publish Post to Channel (pub:<id>)
+  // Helper for rendering and paginating drafts in the review queue
+  async function showReviewDraft(cId, mId, uId, index = 0, isEdit = false) {
+    const drafts = await getDraftPosts(uId, 50);
+    if (!drafts || drafts.length === 0) {
+      const emptyText =
+        '🎉 <b>صف بررسی پیش‌نویس‌ها در حال حاضر خالی است!</b>\n\n' +
+        '💡 <i>نکته:</i> وقتی حالت «انتشار خودکار» روشن باشد، اخبار اسکن‌شده مستقیماً به کانال ارسال می‌شوند و در صف پیش‌نویس قرار نمی‌گیرند.\n' +
+        'برای دریافت اخبار جدید می‌توانید گزینه زیر را بزنید:';
+      const kb = {
+        inline_keyboard: [
+          [{ text: '🔍 اسکن فوری منابع', callback_data: 'act:scan' }],
+          [{ text: '🔙 بازگشت به منوی اصلی', callback_data: 'm:menu' }],
+        ],
+      };
+      if (isEdit && mId) {
+        try {
+          return await api.editMessageText({
+            chat_id: cId,
+            message_id: mId,
+            text: emptyText,
+            parse_mode: 'HTML',
+            reply_markup: kb,
+          });
+        } catch {}
+      }
+      return await api.sendMessage({
+        chat_id: cId,
+        text: emptyText,
+        parse_mode: 'HTML',
+        reply_markup: kb,
+      });
+    }
+
+    const safeIdx = Math.max(0, Math.min(index, drafts.length - 1));
+    const post = drafts[safeIdx];
+    const total = drafts.length;
+
+    const cardText = `📑 <b>پیش‌نویس [${safeIdx + 1} از ${total}]</b> - منبع: <b>${escHtml(post.sourceName)}</b>\n\n${post.formattedHtml}`;
+    const kb = reviewPostKeyboard(post.id, post.sourceUrl, safeIdx, total);
+
+    if (isEdit && mId && !post.imageUrl) {
+      try {
+        return await api.editMessageText({
+          chat_id: cId,
+          message_id: mId,
+          text: cardText,
+          parse_mode: 'HTML',
+          reply_markup: kb,
+        });
+      } catch {}
+    }
+
+    return await sendRichPostSafe({
+      chatId: cId,
+      postHtml: cardText,
+      imageUrl: post.imageUrl,
+      buttons: kb,
+    });
+  }
+
+  // 1.2 Review Queue Navigation
+  if (data.startsWith('m:review')) {
+    const parts = data.split(':');
+    const targetIdx = parseInt(parts[2] || '0', 10);
+    await showReviewDraft(chatId, messageId, from.id, targetIdx, true);
+    return;
+  }
+
+  // 1.3 Publish Mode Menu
+  if (data === 'm:publish_mode') {
+    const currentMode = user.publishMode || 'smart';
+    const pmText =
+      '📰 <b>تنظیم حالت انتشار اخبار در کانال:</b>\n\n' +
+      '⚡ <b>حالت هوشمند (پیش‌فرض):</b> ۱ یا ۲ خبر جدید به صورت تک‌پست اختصاصی، و ۳ خبر به بالا در قالب یک بولتن خلاصه ساعتی تجمیع می‌شود.\n\n' +
+      '📰 <b>تک‌پست اختصاصی:</b> همه اخبار همیشه به صورت جداگانه با تصویر کاور و تحلیل عمیق منتشر می‌شوند.\n\n' +
+      '🗞️ <b>بولتن تجمیعی ساعتی:</b> اخبار همیشه در قالب یک خلاصه گزیده رویدادها بدون تصویر اضافه تجمیع می‌شوند.';
+    try {
+      await api.editMessageText({
+        chat_id: chatId,
+        message_id: messageId,
+        text: pmText,
+        parse_mode: 'HTML',
+        reply_markup: publishModeKeyboard(currentMode),
+      });
+    } catch {
+      await api.sendMessage({
+        chat_id: chatId,
+        text: pmText,
+        parse_mode: 'HTML',
+        reply_markup: publishModeKeyboard(currentMode),
+      });
+    }
+    return;
+  }
+
+  if (data.startsWith('set_pm:')) {
+    const mode = data.replace('set_pm:', '');
+    await updateUser(from.id, { publishMode: mode });
+    user.publishMode = mode;
+    try {
+      await api.answerCallbackQuery({ callback_query_id: query.id, text: '✅ حالت انتشار با موفقیت ذخیره شد.' });
+      await api.editMessageReplyMarkup({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: publishModeKeyboard(mode),
+      });
+    } catch {}
+    return;
+  }
+
+  if (data === 'act:noop') {
+    return;
+  }
+
+  // 2. Publish Post to Channel (pub:<id> or pub:<id>:<index>)
   if (data.startsWith('pub:')) {
-    const postId = parseInt(data.replace('pub:', ''), 10);
+    const parts = data.split(':');
+    const postId = parseInt(parts[1], 10);
+    const curIdx = parseInt(parts[2] || '0', 10);
     const post = await getPostById(postId);
 
     if (!post || post.status === 'published') {
-      await api.sendMessage({ chat_id: chatId, text: '⚠️ این پست قبلاً منتشر شده یا یافت نشد.' });
+      try {
+        await api.answerCallbackQuery({ callback_query_id: query.id, text: 'این پست قبلاً منتشر شده است!' });
+      } catch {}
+      await showReviewDraft(chatId, messageId, from.id, curIdx, true);
       return;
     }
 
@@ -99,6 +219,11 @@ export default async function (query) {
       return;
     }
 
+    let postHtml = post.formattedHtml;
+    if (user.footerText && postHtml && postHtml.includes('──────────────\n')) {
+      postHtml = postHtml.split('──────────────\n')[0] + '──────────────\n' + user.footerText;
+    }
+
     const buttons = buildPostButtons({
       sourceUrl: post.sourceUrl,
       sourceName: post.sourceName,
@@ -108,7 +233,7 @@ export default async function (query) {
 
     const sent = await sendRichPostSafe({
       chatId: user.channelId,
-      postHtml: post.formattedHtml,
+      postHtml: postHtml,
       imageUrl: post.imageUrl,
       buttons,
     });
@@ -116,38 +241,47 @@ export default async function (query) {
     if (sent && sent.message_id) {
       await markPostPublished(post.id, sent.message_id);
       await updateUser(from.id, { postsPublishedCount: (user.postsPublishedCount || 0) + 1 });
-      await api.sendMessage({
-        chat_id: chatId,
-        text: `✅ <b>پست با موفقیت در کانال ${escHtml(user.channelId)} منتشر شد!</b>`,
-        parse_mode: 'HTML',
-      });
+      try {
+        await api.answerCallbackQuery({ callback_query_id: query.id, text: '🚀 پست در کانال منتشر شد! بارگذاری بعدی...' });
+      } catch {}
     } else {
       await api.sendMessage({
         chat_id: chatId,
-        text: `❌ خطا در ارسال به کانال! لطفاً مطمئن شوید ربات در کانال ${escHtml(user.channelId)} مدیر (Admin) است.`,
+        text: `❌ خطا در ارسال به کانال! مطمئن شوید ربات در کانال ${escHtml(user.channelId)} مدیر (Admin) با دسترسی ارسال پیام است.`,
       });
     }
+
+    // Automatically advance to the next draft in line!
+    await showReviewDraft(chatId, messageId, from.id, curIdx, true);
     return;
   }
 
-  // 3. Reject Draft (rej:<id>)
+  // 3. Reject Draft (rej:<id> or rej:<id>:<index>)
   if (data.startsWith('rej:')) {
-    const postId = parseInt(data.replace('rej:', ''), 10);
+    const parts = data.split(':');
+    const postId = parseInt(parts[1], 10);
+    const curIdx = parseInt(parts[2] || '0', 10);
     await markPostRejected(postId);
-    await api.sendMessage({
-      chat_id: chatId,
-      text: '🗑️ این پیش‌نویس رد و از صف خارج شد.',
-    });
+    try {
+      await api.answerCallbackQuery({ callback_query_id: query.id, text: '🗑️ این پیش‌نویس رد شد! بارگذاری بعدی...' });
+    } catch {}
+
+    // Automatically advance to the next draft in line!
+    await showReviewDraft(chatId, messageId, from.id, curIdx, true);
     return;
   }
 
-  // 4. Regenerate Draft (regen:<id>)
+  // 4. Regenerate Draft (regen:<id> or regen:<id>:<index>)
   if (data.startsWith('regen:')) {
-    const postId = parseInt(data.replace('regen:', ''), 10);
+    const parts = data.split(':');
+    const postId = parseInt(parts[1], 10);
+    const curIdx = parseInt(parts[2] || '0', 10);
     const post = await getPostById(postId);
     if (!post) return;
 
-    await api.sendMessage({ chat_id: chatId, text: '🔄 در حال بازنویسی مجدد با هوش مصنوعی...' });
+    try {
+      await api.answerCallbackQuery({ callback_query_id: query.id, text: '🔄 در حال بازنویسی مجدد با هوش مصنوعی...' });
+    } catch {}
 
     try {
       const aiRes = await generateNewsRewrite({
@@ -162,16 +296,17 @@ export default async function (query) {
       const formatted = buildEditorialPost({
         title: 'بازنویسی: ' + post.originalTitle,
         summary: aiRes.text,
-        footerText: user.footerText || '📢 @MyLeitner',
+        footerText: user.footerText || `📢 ${user.channelId || '@MyLeitner'}`,
         useExpandable: true,
       });
 
-      await api.sendMessage({
-        chat_id: chatId,
-        text: `✨ <b>نسخه جدید بازنویسی شد:</b>\n\n${formatted}`,
-        parse_mode: 'HTML',
-        reply_markup: reviewPostKeyboard(post.id, post.sourceUrl),
+      await db.run('UPDATE posts SET formatted_html = :html, ai_summary = :sum WHERE id = :id', {
+        ':html': formatted,
+        ':sum': aiRes.text.slice(0, 200),
+        ':id': post.id,
       });
+
+      await showReviewDraft(chatId, messageId, from.id, curIdx, true);
     } catch (err) {
       await api.sendMessage({ chat_id: chatId, text: `❌ خطا در بازنویسی: ${escHtml(err.message)}` });
     }

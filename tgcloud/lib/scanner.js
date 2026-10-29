@@ -96,8 +96,11 @@ export async function runScanForUser(userId, chatId = null) {
     return;
   }
 
-  // ---------------- CASE A: 1 or 2 News Items -> Publish Individual Rich Posts ----------------
-  if (candidateItems.length < 3) {
+  const publishMode = user.publishMode || 'smart';
+  const shouldAggregate = publishMode === 'bulletin' || (publishMode === 'smart' && candidateItems.length >= 3);
+
+  // ---------------- CASE A: Individual Rich Posts ----------------
+  if (!shouldAggregate) {
     let publishedCount = 0;
 
     for (const item of candidateItems) {
@@ -265,18 +268,13 @@ export async function runScanForUser(userId, chatId = null) {
     footerText: user.footerText || `📢 ${user.channelId || '@MyLeitner'}`,
   });
 
-  const buttons = buildPostButtons({
-    sourceUrl: processedItems[0]?.sourceUrl,
-    sourceName: 'مشاهده متن کامل اخبار',
-    channelUsername: user.channelId,
-  });
-
   // If autoPublish is ON, publish this single bulletin post directly to the channel!
   if (user.autoPublish && user.channelId) {
     const sent = await sendRichPostSafe({
       chatId: user.channelId,
       postHtml: bulletinHtml,
-      buttons,
+      buttons: null, // No inline button: full links are already inside the bulletin text
+      disableWebPagePreview: true, // No web page preview card or preview photo
     });
 
     if (sent && sent.message_id) {

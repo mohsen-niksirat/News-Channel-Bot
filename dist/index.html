@@ -193,6 +193,34 @@
         </div>
       </div>
 
+      <!-- Publishing Mode Selector Card -->
+      <div class="glass-card rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="font-bold text-xs text-slate-300 flex items-center gap-1.5">
+            <span>📰</span>
+            <span>حالت انتشار اخبار در کانال</span>
+          </div>
+          <span id="dispCurrentPublishMode" class="text-[10px] px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 font-bold">⚡ هوشمند</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <button id="btnPmSmart" onclick="savePublishMode('smart')" class="p-2.5 rounded-xl border flex flex-col items-center text-center gap-1 transition-all bg-brand-500/20 border-brand-500/40 text-brand-300 shadow-sm">
+            <span class="text-base">⚡</span>
+            <span class="text-[11px] font-bold">هوشمند</span>
+            <span class="text-[9px] text-slate-400">۱-۲ تک، ۳+ بولتن</span>
+          </button>
+          <button id="btnPmIndividual" onclick="savePublishMode('individual')" class="p-2.5 rounded-xl border flex flex-col items-center text-center gap-1 transition-all bg-white/5 border-white/5 text-slate-300 hover:bg-white/10">
+            <span class="text-base">📰</span>
+            <span class="text-[11px] font-bold">تک‌پست</span>
+            <span class="text-[9px] text-slate-400">همه با عکس و لید</span>
+          </button>
+          <button id="btnPmBulletin" onclick="savePublishMode('bulletin')" class="p-2.5 rounded-xl border flex flex-col items-center text-center gap-1 transition-all bg-white/5 border-white/5 text-slate-300 hover:bg-white/10">
+            <span class="text-base">🗞️</span>
+            <span class="text-[11px] font-bold">بولتن</span>
+            <span class="text-[9px] text-slate-400">تجمیع در یک پست</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Live Custom Providers List -->
       <div class="glass-card rounded-2xl p-4 space-y-2.5">
         <div class="flex items-center justify-between">
@@ -464,6 +492,8 @@
         document.getElementById('statRouterPolicy').innerText = polNames[data.user.routingPolicy] || data.user.routingPolicy || 'فالبک اولویتی';
         const radio = document.querySelector(`input[name="policy"][value="${data.user.routingPolicy || 'fallback'}"]`);
         if (radio) radio.checked = true;
+
+        updatePublishModeUI(data.user.publishMode || 'smart');
       }
 
       appState.keys = Array.isArray(data.keys) ? data.keys : [];
@@ -956,6 +986,35 @@
       document.getElementById('statRouterPolicy').innerText = names[pol] || pol;
       callServerless('update_settings', { routingPolicy: pol });
       showToast('استراتژی با موفقیت تغییر کرد');
+    }
+
+    function updatePublishModeUI(mode) {
+      mode = mode || 'smart';
+      const labels = {
+        smart: '⚡ هوشمند',
+        individual: '📰 تک‌پست اختصاصی',
+        bulletin: '🗞️ بولتن تجمیعی',
+      };
+      const badge = document.getElementById('dispCurrentPublishMode');
+      if (badge) badge.innerText = labels[mode] || mode;
+
+      ['smart', 'individual', 'bulletin'].forEach(m => {
+        const btn = document.getElementById('btnPm' + m.charAt(0).toUpperCase() + m.slice(1));
+        if (!btn) return;
+        if (m === mode) {
+          btn.className = 'p-2.5 rounded-xl border flex flex-col items-center text-center gap-1 transition-all bg-brand-500/20 border-brand-500/40 text-brand-300 shadow-sm';
+        } else {
+          btn.className = 'p-2.5 rounded-xl border flex flex-col items-center text-center gap-1 transition-all bg-white/5 border-white/5 text-slate-300 hover:bg-white/10';
+        }
+      });
+    }
+
+    async function savePublishMode(mode) {
+      haptic('light');
+      appState.user.publishMode = mode;
+      updatePublishModeUI(mode);
+      await callServerless('update_settings', { publishMode: mode });
+      showToast('حالت انتشار با موفقیت تنظیم شد');
     }
 
     function changeChannelPrompt() {

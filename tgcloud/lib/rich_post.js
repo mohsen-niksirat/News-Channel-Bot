@@ -159,6 +159,7 @@ export async function sendRichPostSafe({
   postHtml,
   imageUrl = null,
   buttons = null,
+  disableWebPagePreview = false,
 }) {
   // Telegram caption limit is 1024 chars for photos, message text is 4096 chars
   const isPhoto = Boolean(imageUrl);
@@ -168,6 +169,8 @@ export async function sendRichPostSafe({
   if (safeContent.length > maxLen) {
     safeContent = safeContent.slice(0, maxLen - 15) + '...';
   }
+
+  const linkPreviewOpt = disableWebPagePreview ? { is_disabled: true } : undefined;
 
   // Attempt 1: Full Rich HTML
   try {
@@ -185,7 +188,8 @@ export async function sendRichPostSafe({
         text: safeContent,
         parse_mode: 'HTML',
         reply_markup: buttons || undefined,
-        disable_web_page_preview: false,
+        disable_web_page_preview: disableWebPagePreview,
+        link_preview_options: linkPreviewOpt,
       });
     }
   } catch (err1) {
@@ -214,6 +218,8 @@ export async function sendRichPostSafe({
           text: basicHtml,
           parse_mode: 'HTML',
           reply_markup: retryButtons || undefined,
+          disable_web_page_preview: disableWebPagePreview,
+          link_preview_options: linkPreviewOpt,
         });
       }
     } catch (err2) {
@@ -235,6 +241,8 @@ export async function sendRichPostSafe({
         chat_id: chatId,
         text: plain,
         reply_markup: undefined,
+        disable_web_page_preview: disableWebPagePreview,
+        link_preview_options: linkPreviewOpt,
       });
     }
   }

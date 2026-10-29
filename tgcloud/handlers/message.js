@@ -326,27 +326,36 @@ export default async function (message) {
   }
 
   // 4. Review Queue
-  if (text === '/review' || text === '📑 صف بررسی' || text.includes('پیش‌نویس')) {
-    const drafts = await getDraftPosts(from.id, 1);
+  if (
+    text === '/review' ||
+    text === '📑 صف بررسی' ||
+    text === '📄 صف بررسی پیش‌نویس‌ها' ||
+    text.includes('صف بررسی') ||
+    text.includes('پیش‌نویس')
+  ) {
+    const drafts = await getDraftPosts(from.id, 50);
     if (!drafts || drafts.length === 0) {
       await api.sendMessage({
         chat_id: chat.id,
-        text: '🎉 صف بررسی خالی است! برای دریافت اخبار جدید، گزینه «🔍 اسکن فوری منابع» را بزنید.',
+        text:
+          '🎉 <b>صف بررسی پیش‌نویس‌ها در حال حاضر خالی است!</b>\n\n' +
+          '💡 <i>نکته:</i> وقتی حالت «انتشار خودکار» روشن باشد، اخبار مستقیماً به کانال ارسال می‌شوند و در صف پیش‌نویس قرار نمی‌گیرند.\n' +
+          'برای دریافت اخبار جدید می‌توانید گزینه «🔍 اسکن فوری منابع» را بزنید.',
+        parse_mode: 'HTML',
         reply_markup: mainMenuKeyboard(user),
       });
       return;
     }
 
     const post = drafts[0];
-    const cardText =
-      `📑 <b>پیش‌نویس در انتظار تایید (${post.sourceName}):</b>\n\n` +
-      post.formattedHtml;
+    const total = drafts.length;
+    const cardText = `📑 <b>پیش‌نویس [۱ از ${total}]</b> - منبع: <b>${escHtml(post.sourceName)}</b>\n\n${post.formattedHtml}`;
 
     await sendRichPostSafe({
       chatId: chat.id,
       postHtml: cardText,
       imageUrl: post.imageUrl,
-      buttons: reviewPostKeyboard(post.id, post.sourceUrl),
+      buttons: reviewPostKeyboard(post.id, post.sourceUrl, 0, total),
     });
     return;
   }

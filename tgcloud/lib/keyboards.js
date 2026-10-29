@@ -57,25 +57,36 @@ export function mainReplyKeyboard(userId = null) {
   };
 }
 
-export function reviewPostKeyboard(postId, sourceUrl = '') {
+export function reviewPostKeyboard(postId, sourceUrl = '', currentIndex = 0, totalCount = 1) {
   const rows = [
     [
-      { text: '✅ تایید و انتشار در کانال', callback_data: `pub:${postId}` },
-      { text: '❌ رد پیش‌نویس', callback_data: `rej:${postId}` },
-    ],
-    [
-      { text: '🔁 بازنویسی با مدل دیگر', callback_data: `regen:${postId}` },
+      { text: '✅ تایید و انتشار در کانال', callback_data: `pub:${postId}:${currentIndex}` },
+      { text: '❌ رد پیش‌نویس', callback_data: `rej:${postId}:${currentIndex}` },
     ],
   ];
 
-  if (sourceUrl) {
-    rows.push([
-      { text: '🌐 مشاهده متن کامل در منبع', url: sourceUrl },
-    ]);
+  if (totalCount > 1) {
+    const navRow = [];
+    if (currentIndex > 0) {
+      navRow.push({ text: '⬅️ قبلی', callback_data: `m:review:${currentIndex - 1}` });
+    }
+    navRow.push({ text: `📌 ${currentIndex + 1} از ${totalCount}`, callback_data: 'act:noop' });
+    if (currentIndex < totalCount - 1) {
+      navRow.push({ text: '➡️ بعدی', callback_data: `m:review:${currentIndex + 1}` });
+    }
+    rows.push(navRow);
   }
 
+  const actRow = [
+    { text: '🔁 بازنویسی با مدل دیگر', callback_data: `regen:${postId}:${currentIndex}` },
+  ];
+  if (sourceUrl) {
+    actRow.push({ text: '🌐 متن اصلی', url: sourceUrl });
+  }
+  rows.push(actRow);
+
   rows.push([
-    { text: '🔙 بازگشت به منو', callback_data: 'm:menu' },
+    { text: '🔙 بازگشت به منوی اصلی', callback_data: 'm:menu' },
   ]);
 
   return { inline_keyboard: rows };
@@ -237,20 +248,48 @@ export function keyProviderPickerKeyboard(customProvidersList = []) {
 }
 
 export function channelSettingsKeyboard(user) {
-  const autoIcon = user.autoPublish ? 'روشن ✅' : 'خاموش ❌';
+  const autoIcon = user.autoPublish ? 'روشن 🚀' : 'خاموش 📑';
+  const modeLabels = {
+    individual: '📰 تک‌پست اختصاصی',
+    bulletin: '🗞️ بولتن تجمیعی',
+    smart: '⚡ حالت هوشمند',
+  };
+  const modeText = modeLabels[user.publishMode || 'smart'] || '⚡ حالت هوشمند';
   return {
     inline_keyboard: [
       [
         { text: `📢 آیدی کانال: ${user.channelId || 'تنظیم‌نشده'}`, callback_data: 'act:set_channel' },
       ],
       [
-        { text: `🚀 حالت انتشار خودکار: ${autoIcon}`, callback_data: 'tog:autopub' },
+        { text: `🚀 انتشار خودکار: ${autoIcon}`, callback_data: 'tog:autopub' },
       ],
       [
-        { text: `✏️ ویرایش فوتر و امضا کانال`, callback_data: 'act:set_footer' },
+        { text: `📰 حالت انتشار: ${modeText}`, callback_data: 'm:publish_mode' },
+      ],
+      [
+        { text: `✏️ ویرایش فوتر و امضای کانال`, callback_data: 'act:set_footer' },
       ],
       [
         { text: '🔙 بازگشت به منوی اصلی', callback_data: 'm:menu' },
+      ],
+    ],
+  };
+}
+
+export function publishModeKeyboard(currentMode = 'smart') {
+  return {
+    inline_keyboard: [
+      [
+        { text: `${currentMode === 'smart' ? '✅ ' : ''}⚡ حالت هوشمند (پیش‌فرض)`, callback_data: 'set_pm:smart' },
+      ],
+      [
+        { text: `${currentMode === 'individual' ? '✅ ' : ''}📰 تک‌پست اختصاصی (تمام اخبار جداگانه)`, callback_data: 'set_pm:individual' },
+      ],
+      [
+        { text: `${currentMode === 'bulletin' ? '✅ ' : ''}🗞️ بولتن تجمیعی ساعتی (همیشه یک پست)`, callback_data: 'set_pm:bulletin' },
+      ],
+      [
+        { text: '🔙 بازگشت به تنظیمات کانال', callback_data: 'm:channel' },
       ],
     ],
   };

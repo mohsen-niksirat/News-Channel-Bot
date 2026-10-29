@@ -8,6 +8,7 @@ export const users = table('users', {
   channelId:           text('channel_id'),        // e.g. "@MyLeitner" or "-100..."
   channelTitle:        text('channel_title'),
   autoPublish:         boolean('auto_publish').default(false), // true = instant publish, false = review queue
+  publishMode:         text('publish_mode').default('smart'),  // 'smart' | 'individual' | 'bulletin'
   preferredAiProvider: text('preferred_ai_provider').default('gemini'),
   preferredModel:      text('preferred_model').default('gemini-1.5-flash'),
   routingPolicy:       text('routing_policy').default('fallback'), // 'fallback' | 'round_robin' | 'smart_router' | 'fusion'

@@ -73,6 +73,7 @@ export default async function (input, ctx) {
         username: user.username,
         channelId: user.channelId,
         autoPublish: !!user.autoPublish,
+        publishMode: user.publishMode || 'smart',
         routingPolicy: user.routingPolicy || 'fallback',
         preferredProvider: user.preferredAiProvider || 'gemini',
         footerText: user.footerText,
@@ -138,6 +139,7 @@ export default async function (input, ctx) {
     const updates = {};
     if (input.channelId !== undefined) updates.channelId = input.channelId;
     if (input.autoPublish !== undefined) updates.autoPublish = input.autoPublish ? 1 : 0;
+    if (input.publishMode !== undefined) updates.publishMode = input.publishMode;
     if (input.routingPolicy !== undefined) updates.routingPolicy = input.routingPolicy;
     if (input.preferredAiProvider !== undefined) updates.preferredAiProvider = input.preferredAiProvider;
     if (input.footerText !== undefined) updates.footerText = input.footerText;
