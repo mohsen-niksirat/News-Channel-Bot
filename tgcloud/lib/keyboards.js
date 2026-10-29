@@ -6,7 +6,7 @@ import { ROUTING_POLICIES } from 'lib/ai_router';
 
 export function mainMenuKeyboard(user) {
   const autoPubStatus = user.autoPublish ? 'روشن 🚀' : 'دستی 📑';
-  const miniAppUrl = 'https://mohsen-niksirat.github.io/News-Channel-Bot/app.html';
+  const miniAppUrl = 'https://app9260009899.tgcloud.ai/';
   return {
     inline_keyboard: [
       [
@@ -33,7 +33,7 @@ export function mainMenuKeyboard(user) {
 }
 
 export function mainReplyKeyboard() {
-  const miniAppUrl = 'https://mohsen-niksirat.github.io/News-Channel-Bot/app.html';
+  const miniAppUrl = 'https://app9260009899.tgcloud.ai/';
   return {
     keyboard: [
       [

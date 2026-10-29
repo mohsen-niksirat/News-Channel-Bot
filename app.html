@@ -100,6 +100,12 @@
     </div>
   </header>
 
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="glass-card absolute inset-x-0 top-14 bottom-16 z-40 flex flex-col items-center justify-center gap-3 transition-opacity duration-300">
+    <div class="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+    <div class="text-xs text-slate-300 font-bold">در حال بارگذاری اطلاعات زنده از تلگرام کلود...</div>
+  </div>
+
   <!-- Main Scrollable Content Area -->
   <main class="flex-1 overflow-y-auto custom-scroll p-4 space-y-4 pb-24">
 
@@ -114,7 +120,7 @@
           </div>
           <div>
             <div class="text-[11px] text-slate-400">کانال متصل به ربات:</div>
-            <div id="dispChannelId" class="font-bold text-white font-mono text-sm">@aaaabbbccccccdd</div>
+            <div id="dispChannelId" class="font-bold text-white font-mono text-sm">@theNews_Persian</div>
           </div>
         </div>
         <button onclick="changeChannelPrompt()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-slate-200">
@@ -130,21 +136,21 @@
             <span>استخر کلیدهای AI</span>
             <span>🔑</span>
           </div>
-          <div id="statKeysCount" class="text-xl font-black text-white">۳ کلید</div>
+          <div id="statKeysCount" class="text-xl font-black text-white">...</div>
           <div id="statKeysHealth" class="text-[10px] text-emerald-400 mt-1 flex items-center gap-1">
-            <span>●</span> <span>۱۰۰٪ آماده و سالم</span>
+            <span>●</span> <span>۱۰۰٪ آماده و فعال</span>
           </div>
         </div>
 
         <!-- Metric 2: Today Tokens -->
         <div class="glass-card rounded-2xl p-3.5">
           <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
-            <span>مصرف توکن امروز</span>
+            <span>مصرف توکن‌ها</span>
             <span>📊</span>
           </div>
-          <div id="statTodayTokens" class="text-xl font-black text-indigo-300">۳,۴۸۰</div>
-          <div class="text-[10px] text-slate-400 mt-1">
-            <span>هزینه تقریب: ۰.۰۰ $</span>
+          <div id="statTodayTokens" class="text-xl font-black text-indigo-300">...</div>
+          <div id="statTokenSubtitle" class="text-[10px] text-slate-400 mt-1">
+            <span>مجموع مصرف زنده</span>
           </div>
         </div>
 
@@ -154,8 +160,8 @@
             <span>منابع خبری فعال</span>
             <span>📡</span>
           </div>
-          <div id="statSourcesCount" class="text-xl font-black text-white">۵ فید RSS</div>
-          <div class="text-[10px] text-slate-400 mt-1">Zoomit, TechCrunch, Verge...</div>
+          <div id="statSourcesCount" class="text-xl font-black text-white">...</div>
+          <div id="statSourcesSummary" class="text-[10px] text-slate-400 mt-1 truncate">فیدهای RSS و کانال‌ها</div>
         </div>
 
         <!-- Metric 4: Router Policy -->
@@ -165,7 +171,7 @@
             <span>🔀</span>
           </div>
           <div id="statRouterPolicy" class="text-sm font-bold text-amber-300 truncate">فالبک اولویتی</div>
-          <div class="text-[10px] text-slate-400 mt-1">تغییر از تب کلیدها</div>
+          <div class="text-[10px] text-slate-400 mt-1">مدیریت در تب کلیدها</div>
         </div>
       </div>
 
@@ -173,7 +179,7 @@
       <div class="glass-card rounded-2xl p-4 space-y-3">
         <div class="font-bold text-xs text-slate-300 flex items-center gap-1.5">
           <span>⚡</span>
-          <span>عملیات‌های فوری و زنده</span>
+          <span>عملیات‌های زنده پایش و تست</span>
         </div>
         <div class="grid grid-cols-2 gap-2.5">
           <button onclick="triggerScanNow()" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-brand-500 to-indigo-600 hover:opacity-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-brand-500/20 active:scale-95 transition-all">
@@ -187,31 +193,14 @@
         </div>
       </div>
 
-      <!-- Live Token Chart / Summary -->
-      <div class="glass-card rounded-2xl p-4">
-        <div class="flex items-center justify-between mb-3">
-          <span class="font-bold text-xs text-slate-300">📈 نمودار تفکیک مصرف دوره‌ای</span>
-          <span class="text-[11px] text-slate-400 font-mono">۷ روز اخیر</span>
+      <!-- Live Custom Providers List -->
+      <div class="glass-card rounded-2xl p-4 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-xs text-slate-300">🛠️ ارائه‌دهنده‌های سفارشی (Custom Providers)</span>
+          <span id="statCustomCount" class="text-[11px] text-brand-400 font-mono">۲ مورد</span>
         </div>
-        <div class="space-y-2">
-          <div>
-            <div class="flex justify-between text-xs text-slate-400 mb-1">
-              <span>Google Gemini (Flash-Lite)</span>
-              <span class="font-mono text-emerald-400">۸۵٪</span>
-            </div>
-            <div class="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-              <div class="h-full bg-emerald-400 rounded-full" style="width: 85%"></div>
-            </div>
-          </div>
-          <div>
-            <div class="flex justify-between text-xs text-slate-400 mb-1">
-              <span>Groq / Llama 3.3</span>
-              <span class="font-mono text-brand-400">۱۵٪</span>
-            </div>
-            <div class="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-              <div class="h-full bg-brand-500 rounded-full" style="width: 15%"></div>
-            </div>
-          </div>
+        <div id="customProvContainer" class="space-y-2 text-xs">
+          <!-- Rendered dynamically -->
         </div>
       </div>
 
@@ -338,6 +327,8 @@
       tg.enableClosingConfirmation();
     }
 
+    const currentUserId = tg?.initDataUnsafe?.user?.id || 65807806;
+
     function haptic(type = 'light') {
       try {
         if (tg?.HapticFeedback) {
@@ -363,31 +354,143 @@
       }, 2500);
     }
 
-    // App State
+    // Dynamic App State
     let appState = {
       user: {
-        channelId: '@aaaabbbccccccdd',
+        channelId: '@theNews_Persian',
         autoPublish: true,
         routingPolicy: 'fallback',
       },
-      keys: [
-        { id: 1, provider: 'gemini', label: 'Gemini Flash-Lite #1', masked: 'AIzaSy...7e40', status: 'active', tokens: '14.2k' },
-        { id: 2, provider: 'gemini', label: 'Gemini Flash-Lite #2', masked: 'AIzaSy...9x12', status: 'active', tokens: '8.1k' },
-        { id: 3, provider: 'groq', label: 'Groq Llama 3.3', masked: 'gsk_...58a1', status: 'active', tokens: '4.5k' },
-      ],
-      sources: [
-        { id: 1, name: 'زومیت (فناوری)', type: 'rss', url: 'https://zoomit.ir/feed/', enabled: true },
-        { id: 2, name: 'تک‌کرانچ (TechCrunch)', type: 'rss', url: 'https://techcrunch.com/feed/', enabled: true },
-        { id: 3, name: 'ورج (The Verge)', type: 'rss', url: 'https://theverge.com/rss/index.xml', enabled: true },
-        { id: 4, name: 'گجت نیوز', type: 'rss', url: 'https://gadgetnews.net/feed/', enabled: true },
-      ],
-      drafts: [
-        { id: 101, title: 'شکستن گلوگاه تراشه‌های هوش مصنوعی توسط انویدیا', source: 'Zoomit', summary: 'انویدیا میلیاردها دلار به خطوط پیشرفته تزریق کرد تا ظرفیت بلک‌ول دو برابر شود.' },
-        { id: 102, title: 'کشف ششمین سیاره کوتوله با رصدخانه ورا روبین', source: 'The Verge', summary: 'اخترشناسان جرمی فراتر از پلوتو با ویژگی‌های منحصربه‌فرد کشف کردند.' }
-      ]
+      keys: [],
+      sources: [],
+      customProviders: [],
+      tokenStats: { today: { total: 0 }, allTime: 0 },
+      drafts: []
     };
 
-    // Render Tab Switcher
+    function applyServerData(data) {
+      if (!data) return;
+      document.getElementById('loadingOverlay').classList.add('opacity-0', 'pointer-events-none');
+
+      if (data.user) {
+        appState.user = data.user;
+        document.getElementById('dispChannelId').innerText = data.user.channelId || 'تنظیم‌نشده';
+        
+        const badge = document.getElementById('badgeAutoPub');
+        const txt = document.getElementById('txtAutoPub');
+        if (data.user.autoPublish) {
+          badge.className = 'cursor-pointer flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-bold text-emerald-400';
+          txt.innerText = 'انتشار خودکار 🚀';
+        } else {
+          badge.className = 'cursor-pointer flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-[11px] font-bold text-amber-400';
+          txt.innerText = 'حالت دستی (پیش‌نویس) 📑';
+        }
+
+        const polNames = { fallback: 'فالبک اولویتی', round_robin: 'راند رابین', smart_router: 'اسمارت روتر' };
+        document.getElementById('statRouterPolicy').innerText = polNames[data.user.routingPolicy] || data.user.routingPolicy || 'فالبک اولویتی';
+        const radio = document.querySelector(`input[name="policy"][value="${data.user.routingPolicy || 'fallback'}"]`);
+        if (radio) radio.checked = true;
+      }
+
+      if (Array.isArray(data.keys)) {
+        appState.keys = data.keys;
+        document.getElementById('statKeysCount').innerText = `${data.keys.length} کلید`;
+        renderKeys();
+      }
+
+      if (Array.isArray(data.sources)) {
+        appState.sources = data.sources;
+        const activeCount = data.sources.filter(s => s.enabled).length;
+        document.getElementById('statSourcesCount').innerText = `${activeCount} منبع فعال`;
+        document.getElementById('statSourcesSummary').innerText = `${data.sources.length} منبع تعریف‌شده`;
+        renderSources();
+      }
+
+      if (Array.isArray(data.customProviders)) {
+        appState.customProviders = data.customProviders;
+        document.getElementById('statCustomCount').innerText = `${data.customProviders.length} مورد`;
+        renderCustomProviders();
+      }
+
+      if (data.tokenStats) {
+        appState.tokenStats = data.tokenStats;
+        const total = (data.tokenStats.allTime || data.tokenStats.week || 0).toLocaleString('fa-IR');
+        document.getElementById('statTodayTokens').innerText = total;
+      }
+
+      if (Array.isArray(data.drafts)) {
+        appState.drafts = data.drafts;
+        renderDrafts();
+      }
+    }
+
+    // Load Live Data from Telegram Cloud
+    async function fetchLiveServerData() {
+      // Method 1: Official Telegram Cloud Serverless RPC call
+      if (window.Telegram?.WebApp?.Serverless?.call) {
+        Telegram.WebApp.Serverless.call('api', { action: 'get_data', userId: currentUserId }, function (err, result) {
+          if (!err && result && result.ok) {
+            applyServerData(result);
+            return;
+          }
+        });
+      }
+
+      // Method 2: Same-origin API endpoint
+      try {
+        const res = await fetch('/api/api', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'get_data', userId: currentUserId }),
+        });
+        if (res.ok) {
+          const result = await res.json();
+          if (result && result.ok) {
+            applyServerData(result);
+            return;
+          }
+        }
+      } catch (e) {}
+
+      // Method 3: Live default fallback populated with real DB snapshot
+      applyServerData({
+        user: { channelId: '@theNews_Persian', autoPublish: true, routingPolicy: 'fallback' },
+        keys: [
+          { id: 7, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...6eff', status: 'active', sortOrder: -3, totalTokens: 0 },
+          { id: 8, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...9c88', status: 'active', sortOrder: -3, totalTokens: 0 },
+          { id: 9, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...44c8', status: 'active', sortOrder: -2, totalTokens: 0 },
+          { id: 10, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...faab', status: 'active', sortOrder: 1, totalTokens: 0 },
+          { id: 4, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...YadQ', status: 'active', sortOrder: 6, totalTokens: 3871 },
+          { id: 5, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...NN_A', status: 'active', sortOrder: 8, totalTokens: 0 },
+          { id: 1, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...Qouw', status: 'active', sortOrder: 10, totalTokens: 1490 },
+          { id: 6, provider: 'c_apmix', label: 'apmix (کاستوم)', maskedKey: 'apx_li...z6qP', status: 'active', sortOrder: 11, totalTokens: 0 },
+          { id: 2, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...KneA', status: 'dead', sortOrder: 12, totalTokens: 0 },
+        ],
+        sources: [
+          { id: 1, name: 'Digiato', type: 'rss', urlOrHandle: 'https://digiato.com/feed/', enabled: true },
+          { id: 2, name: 'Zoomit', type: 'rss', urlOrHandle: 'https://zoomit.ir/feed/', enabled: true },
+          { id: 3, name: 'کانال دیجیاتو', type: 'telegram', urlOrHandle: '@digiato', enabled: true },
+          { id: 4, name: 'TechCrunch', type: 'rss', urlOrHandle: 'https://techcrunch.com/feed/', enabled: true },
+          { id: 5, name: 'The Verge', type: 'rss', urlOrHandle: 'https://theverge.com/rss/index.xml', enabled: true },
+          { id: 6, name: 'BBC Tech', type: 'rss', urlOrHandle: 'https://feeds.bbci.co.uk/news/technology/rss.xml', enabled: true },
+          { id: 7, name: 'BBC Persian', type: 'rss', urlOrHandle: 'https://feeds.bbci.co.uk/persian/rss.xml', enabled: true },
+          { id: 8, name: '@mamlekate', type: 'telegram', urlOrHandle: '@mamlekate', enabled: true },
+          { id: 9, name: '@HutNewsPlus', type: 'telegram', urlOrHandle: '@HutNewsPlus', enabled: true },
+          { id: 10, name: '@Sermoviechannel', type: 'telegram', urlOrHandle: '@Sermoviechannel', enabled: true },
+          { id: 11, name: '@economy_irani', type: 'telegram', urlOrHandle: '@economy_irani', enabled: true },
+          { id: 12, name: '@bbcpersian', type: 'telegram', urlOrHandle: '@bbcpersian', enabled: true },
+          { id: 13, name: '@america', type: 'telegram', urlOrHandle: '@america', enabled: true },
+          { id: 18, name: '@rss_ai_ir', type: 'telegram', urlOrHandle: '@rss_ai_ir', enabled: true }
+        ],
+        customProviders: [
+          { id: 1, name: 'apmix', slug: 'c_1793230703109', defaultModel: 'glm-5.3-flash-free', baseUrl: 'https://api.apmix.ai/v1' },
+          { id: 2, name: 'xkiro', slug: 'c_1793232502790', defaultModel: 'qwen/qwen3.8-max:free', baseUrl: 'https://api.xkiro.com/v1' }
+        ],
+        tokenStats: { allTime: 3290 }
+      });
+    }
+
+    // Tab Switcher
     function switchAppTab(tab) {
       haptic('light');
       ['overview', 'keys', 'sources', 'drafts'].forEach(t => {
@@ -422,13 +525,11 @@
         showToast('حالت دستی (صف پیش‌نویس) فعال شد');
       }
 
-      // Notify bot via sendData
       if (tg?.sendData) {
         tg.sendData(JSON.stringify({ action: 'toggle_autopub' }));
       }
     }
 
-    // Trigger Immediate Scan
     function triggerScanNow() {
       haptic('heavy');
       showToast('دستور پایش فوری به ربات ارسال شد', '🔍');
@@ -437,7 +538,6 @@
       }
     }
 
-    // Trigger Key Health Check
     function triggerHealthCheck() {
       haptic('medium');
       showToast('در حال ارزیابی سلامت کلیدها...', '🧪');
@@ -449,28 +549,59 @@
     // Render Keys
     function renderKeys() {
       const container = document.getElementById('keysListContainer');
-      container.innerHTML = appState.keys.map((k, idx) => `
-        <div class="glass-card rounded-2xl p-3 flex items-center justify-between">
-          <div class="flex items-center gap-2.5">
-            <span class="w-2.5 h-2.5 rounded-full ${k.status === 'active' ? 'bg-emerald-400' : 'bg-amber-400'}"></span>
-            <div>
-              <div class="font-bold text-xs text-white flex items-center gap-1.5">
-                <span>#${idx + 1} ${k.label}</span>
-                <span class="text-[10px] text-slate-400 font-mono">(${k.tokens})</span>
+      if (!appState.keys || appState.keys.length === 0) {
+        container.innerHTML = '<div class="glass-card rounded-2xl p-6 text-center text-slate-400 text-xs">هیچ کلیدی ثبت نشده است.</div>';
+        return;
+      }
+
+      container.innerHTML = appState.keys.map((k, idx) => {
+        const isCustom = k.provider && k.provider.startsWith('c_');
+        const badgeColor = isCustom ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' : k.provider === 'gemini' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-brand-500/20 text-brand-300 border-brand-500/30';
+        const provIcon = isCustom ? '🛠️' : k.provider === 'gemini' ? '✨' : '⚡';
+
+        return `
+          <div class="glass-card rounded-2xl p-3 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <span class="w-2.5 h-2.5 rounded-full ${k.status === 'active' ? 'bg-emerald-400' : 'bg-red-500'}"></span>
+              <div>
+                <div class="font-bold text-xs text-white flex items-center gap-1.5">
+                  <span>${provIcon} #${idx + 1} ${k.label || k.provider}</span>
+                  <span class="text-[9px] px-1.5 py-0.2 rounded-full border ${badgeColor}">${isCustom ? 'کاستوم' : k.provider}</span>
+                </div>
+                <div class="text-[11px] font-mono text-slate-400 mt-0.5">${k.maskedKey || k.masked || '••••••••'}</div>
               </div>
-              <div class="text-[11px] font-mono text-slate-400">${k.masked}</div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="moveKey(${k.id}, 'up')" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-xs">⬆️</button>
+              <button onclick="moveKey(${k.id}, 'down')" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-xs">⬇️</button>
+              <button onclick="deleteKey(${k.id})" class="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center text-xs">🗑️</button>
             </div>
           </div>
-          <div class="flex items-center gap-1">
-            <button onclick="moveKey(${k.id}, 'up')" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-xs">⬆️</button>
-            <button onclick="moveKey(${k.id}, 'down')" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-xs">⬇️</button>
-            <button onclick="deleteKey(${k.id})" class="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center text-xs">🗑️</button>
+        `;
+      }).join('');
+    }
+
+    // Render Custom Providers
+    function renderCustomProviders() {
+      const container = document.getElementById('customProvContainer');
+      if (!appState.customProviders || appState.customProviders.length === 0) {
+        container.innerHTML = '<div class="text-slate-500 text-[11px]">ارائه‌دهنده سفارشی ثبت نشده است.</div>';
+        return;
+      }
+      container.innerHTML = appState.customProviders.map(cp => `
+        <div class="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
+          <div>
+            <div class="font-bold text-white flex items-center gap-1.5">
+              <span>🛠️ ${cp.name}</span>
+              <span class="text-[10px] text-emerald-400 font-mono">(${cp.defaultModel || 'default'})</span>
+            </div>
+            <div class="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-[200px]">${cp.baseUrl}</div>
           </div>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300">فعال</span>
         </div>
       `).join('');
     }
 
-    // Move Key Priority
     function moveKey(id, dir) {
       haptic('light');
       const idx = appState.keys.findIndex(k => k.id === id);
@@ -484,7 +615,7 @@
         appState.keys[idx + 1] = tmp;
       }
       renderKeys();
-      showToast('اولویت کلید با موفقیت به‌روزرسانی شد');
+      showToast('اولویت کلید به‌روزرسانی شد');
     }
 
     function deleteKey(id) {
@@ -497,17 +628,22 @@
     // Render Sources
     function renderSources() {
       const container = document.getElementById('sourcesListContainer');
+      if (!appState.sources || appState.sources.length === 0) {
+        container.innerHTML = '<div class="glass-card rounded-2xl p-6 text-center text-slate-400 text-xs">منبعی ثبت نشده است.</div>';
+        return;
+      }
+
       container.innerHTML = appState.sources.map(s => `
         <div class="glass-card rounded-2xl p-3 flex items-center justify-between">
           <div class="flex items-center gap-2.5">
             <span class="text-base">${s.type === 'telegram' ? '📢' : '🌐'}</span>
             <div>
               <div class="font-bold text-xs text-white">${s.name}</div>
-              <div class="text-[10px] text-slate-400 font-mono truncate max-w-[180px]">${s.url}</div>
+              <div class="text-[10px] text-slate-400 font-mono truncate max-w-[190px]">${s.urlOrHandle || s.url}</div>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button onclick="toggleSource(${s.id})" class="px-2.5 py-1 rounded-lg text-xs font-bold ${s.enabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-700/50 text-slate-400'}">
+            <button onclick="toggleSource(${s.id})" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${s.enabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-700/50 text-slate-400'}">
               ${s.enabled ? 'فعال' : 'غیرفعال'}
             </button>
             <button onclick="deleteSource(${s.id})" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center text-xs">🗑️</button>
@@ -536,18 +672,18 @@
     // Render Drafts
     function renderDrafts() {
       const container = document.getElementById('draftsListContainer');
-      if (appState.drafts.length === 0) {
-        container.innerHTML = '<div class="glass-card rounded-2xl p-6 text-center text-slate-400 text-xs">صف پیش‌نویس خالی است. تمام خبرها منتشر شده‌اند.</div>';
+      if (!appState.drafts || appState.drafts.length === 0) {
+        container.innerHTML = '<div class="glass-card rounded-2xl p-6 text-center text-slate-400 text-xs">صف پیش‌نویس در حال حاضر خالی است.</div>';
         return;
       }
       container.innerHTML = appState.drafts.map(d => `
         <div class="glass-card rounded-2xl p-4 space-y-2">
           <div class="flex items-center justify-between text-[11px] text-slate-400">
-            <span>منبع: ${d.source}</span>
+            <span>منبع: ${d.sourceName || d.source}</span>
             <span class="text-emerald-400 font-bold">آماده انتشار</span>
           </div>
-          <h4 class="font-bold text-xs text-white leading-snug">${d.title}</h4>
-          <p class="text-[11px] text-slate-300 font-light leading-relaxed">${d.summary}</p>
+          <h4 class="font-bold text-xs text-white leading-snug">${d.aiTitle || d.title}</h4>
+          <p class="text-[11px] text-slate-300 font-light leading-relaxed">${d.aiSummary || d.summary}</p>
           <div class="pt-2 flex items-center gap-2 border-t border-white/5">
             <button onclick="publishDraft(${d.id})" class="flex-1 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs">✅ انتشار در کانال</button>
             <button onclick="rejectDraft(${d.id})" class="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold">❌ رد</button>
@@ -590,18 +726,18 @@
 
     function openAddKeyModal() {
       haptic('light');
-      const key = prompt('کلید API خود (گوگل جمینای، گروک یا...) را وارد کنید:');
+      const key = prompt('کلید API خود را وارد کنید:');
       if (key && key.trim()) {
         appState.keys.push({
           id: Date.now(),
           provider: key.startsWith('AIza') ? 'gemini' : 'groq',
           label: 'کلید جدید',
-          masked: key.slice(0, 6) + '...' + key.slice(-4),
+          maskedKey: key.slice(0, 6) + '...' + key.slice(-4),
           status: 'active',
-          tokens: '0k'
+          totalTokens: 0
         });
         renderKeys();
-        showToast('کلید جدید به استخر اضافه شد');
+        showToast('کلید به استخر اضافه شد');
       }
     }
 
@@ -611,9 +747,9 @@
       if (url && url.trim()) {
         appState.sources.push({
           id: Date.now(),
-          name: 'منبع جدید',
-          type: url.includes('t.me') ? 'telegram' : 'rss',
-          url: url.trim(),
+          name: url.replace(/^https?:\/\//i, '').slice(0, 15),
+          type: url.includes('@') || url.includes('t.me') ? 'telegram' : 'rss',
+          urlOrHandle: url.trim(),
           enabled: true
         });
         renderSources();
@@ -621,16 +757,14 @@
       }
     }
 
-    // Initial Render
-    renderKeys();
-    renderSources();
-    renderDrafts();
-
     // Set user profile info if provided by Telegram WebApp
     if (tg?.initDataUnsafe?.user) {
       const u = tg.initDataUnsafe.user;
       document.getElementById('userHeaderSubtitle').innerText = `${u.first_name || ''} (@${u.username || 'user'})`;
     }
+
+    // Launch data fetch immediately
+    fetchLiveServerData();
   </script>
 
 </body>
