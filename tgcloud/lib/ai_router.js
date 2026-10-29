@@ -27,14 +27,15 @@ export const ROUTING_POLICIES = {
 /**
  * Retrieves the best available API key for a provider with policy support
  */
-export async function getNextAvailableKey(provider, userId = null, policy = 'fallback') {
+export async function getNextAvailableKey(provider, userId, policy = 'fallback') {
+  if (!userId) return null;
   const now = Math.floor(Date.now() / 1000);
 
   const baseConds = [
     eq(aiKeys.provider, provider),
     eq(aiKeys.status, 'active'),
+    eq(aiKeys.userId, userId),
   ];
-  if (userId) baseConds.push(eq(aiKeys.userId, userId));
 
   let query = db
     .select()
@@ -58,8 +59,8 @@ export async function getNextAvailableKey(provider, userId = null, policy = 'fal
       eq(aiKeys.provider, provider),
       eq(aiKeys.status, 'cooldown'),
       sql`cooldown_until <= ${now}`,
+      eq(aiKeys.userId, userId),
     ];
-    if (userId) cdConds.push(eq(aiKeys.userId, userId));
 
     const recovered = await db
       .select()
@@ -269,6 +270,9 @@ export async function generateNewsRewrite({
   userId = null,
   routingPolicy = 'fallback',
 }) {
+  if (!userId) {
+    throw new Error('شناسه کاربر جهت استفاده از کلیدهای اختصاصی مشخص نیست');
+  }
   const providerChain = [
     preferredProvider,
     ...['gemini', 'groq', 'deepseek', 'openai', 'openrouter'].filter((p) => p !== preferredProvider),

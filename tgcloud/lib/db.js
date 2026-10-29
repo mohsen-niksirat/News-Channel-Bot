@@ -104,14 +104,8 @@ export async function deleteSource(sourceId, userId) {
 }
 
 // ---------------- Custom Providers ----------------
-export async function getCustomProviders(userId = null) {
-  if (!userId) {
-    return await db
-      .select()
-      .from(customProviders)
-      .orderBy(customProviders.id)
-      .all();
-  }
+export async function getCustomProviders(userId) {
+  if (!userId) return [];
   return await db
     .select()
     .from(customProviders)
@@ -193,14 +187,8 @@ export async function addAiKey({ userId = null, provider, apiKey, label, baseUrl
   return created;
 }
 
-export async function getAiKeys(userId = null) {
-  if (!userId) {
-    return await db
-      .select()
-      .from(aiKeys)
-      .orderBy(asc(aiKeys.sortOrder), asc(aiKeys.id))
-      .all();
-  }
+export async function getAiKeys(userId) {
+  if (!userId) return [];
   return await db
     .select()
     .from(aiKeys)
@@ -209,15 +197,13 @@ export async function getAiKeys(userId = null) {
     .all();
 }
 
-export async function deleteAiKey(keyId, userId = null) {
-  if (userId) {
-    await db.delete(aiKeys).where(and(eq(aiKeys.id, keyId), eq(aiKeys.userId, userId))).run();
-  } else {
-    await db.delete(aiKeys).where(eq(aiKeys.id, keyId)).run();
-  }
+export async function deleteAiKey(keyId, userId) {
+  if (!userId || !keyId) return;
+  await db.delete(aiKeys).where(and(eq(aiKeys.id, keyId), eq(aiKeys.userId, userId))).run();
 }
 
-export async function moveAiKeyPriority(keyId, direction, userId = null) {
+export async function moveAiKeyPriority(keyId, direction, userId) {
+  if (!userId || !keyId) return;
   const all = await getAiKeys(userId);
   const idx = all.findIndex((k) => k.id === keyId);
   if (idx === -1) return;
@@ -228,16 +214,16 @@ export async function moveAiKeyPriority(keyId, direction, userId = null) {
     const prevOrder = prev.sortOrder !== undefined ? prev.sortOrder : (idx - 1);
     const currOrder = curr.sortOrder !== undefined ? curr.sortOrder : idx;
     const targetOrder = prevOrder <= currOrder ? prevOrder - 1 : prevOrder;
-    await db.update(aiKeys).set({ sortOrder: targetOrder }).where(eq(aiKeys.id, curr.id)).run();
-    await db.update(aiKeys).set({ sortOrder: currOrder + 1 }).where(eq(aiKeys.id, prev.id)).run();
+    await db.update(aiKeys).set({ sortOrder: targetOrder }).where(and(eq(aiKeys.id, curr.id), eq(aiKeys.userId, userId))).run();
+    await db.update(aiKeys).set({ sortOrder: currOrder + 1 }).where(and(eq(aiKeys.id, prev.id), eq(aiKeys.userId, userId))).run();
   } else if (direction === 'down' && idx < all.length - 1) {
     const next = all[idx + 1];
     const curr = all[idx];
     const nextOrder = next.sortOrder !== undefined ? next.sortOrder : (idx + 1);
     const currOrder = curr.sortOrder !== undefined ? curr.sortOrder : idx;
     const targetOrder = nextOrder >= currOrder ? nextOrder + 1 : nextOrder;
-    await db.update(aiKeys).set({ sortOrder: targetOrder }).where(eq(aiKeys.id, curr.id)).run();
-    await db.update(aiKeys).set({ sortOrder: currOrder - 1 }).where(eq(aiKeys.id, next.id)).run();
+    await db.update(aiKeys).set({ sortOrder: targetOrder }).where(and(eq(aiKeys.id, curr.id), eq(aiKeys.userId, userId))).run();
+    await db.update(aiKeys).set({ sortOrder: currOrder - 1 }).where(and(eq(aiKeys.id, next.id), eq(aiKeys.userId, userId))).run();
   }
 }
 
@@ -271,6 +257,15 @@ export async function recordTokenUsage({
 }
 
 export async function getTokenUsageStats(userId) {
+  if (!userId) {
+    return {
+      today: { total: 0, prompt: 0, completion: 0 },
+      week: 0,
+      month: 0,
+      allTime: 0,
+      byProvider: {},
+    };
+  }
   const now = Math.floor(Date.now() / 1000);
   const dayStart = now - (now % 86400); // Today midnight
   const weekAgo = now - 7 * 86400;

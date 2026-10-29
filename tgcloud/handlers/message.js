@@ -102,7 +102,7 @@ export default async function (message) {
     await api.sendMessage({
       chat_id: chat.id,
       text: '❌ عملیات لغو شد و به منوی اصلی بازگشتید.',
-      reply_markup: mainReplyKeyboard(),
+      reply_markup: mainReplyKeyboard(from.id),
     });
     return;
   }
@@ -314,7 +314,7 @@ export default async function (message) {
     await api.sendMessage({
       chat_id: chat.id,
       text: '👇 نوار دسترسی سریع فعال است:',
-      reply_markup: mainReplyKeyboard(),
+      reply_markup: mainReplyKeyboard(from.id),
     });
     return;
   }

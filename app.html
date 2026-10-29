@@ -333,10 +333,27 @@
     let currentUserId = tg?.initDataUnsafe?.user?.id;
     if (!currentUserId) {
       const p = new URLSearchParams(window.location.search);
-      currentUserId = parseInt(p.get('uid') || '0', 10);
+      const uidParam = p.get('uid');
+      if (uidParam) {
+        currentUserId = parseInt(uidParam, 10);
+      }
     }
     if (!currentUserId) {
-      currentUserId = 65807806; // Fallback only for Mohsen's preview
+      currentUserId = null; // Strictly isolated, no hardcoded fallbacks
+    }
+
+    // Helper to invoke Serverless RPC actions
+    function callServerless(action, payload = {}) {
+      if (!currentUserId) return;
+      if (window.Telegram?.WebApp?.Serverless?.call) {
+        try {
+          window.Telegram.WebApp.Serverless.call('api', { action, ...payload, userId: currentUserId }, function (err, res) {
+            if (err) console.warn('Serverless action error:', err);
+          });
+        } catch (e) {
+          console.warn('Serverless call failed:', e);
+        }
+      }
     }
 
     function haptic(type = 'light') {
@@ -435,29 +452,33 @@
 
     // Load Live Data from Telegram Cloud
     async function fetchLiveServerData() {
-      // Safety auto-dismiss: overlay will NEVER stay visible for more than 500ms
       const safetyTimer = setTimeout(() => {
         hideLoadingOverlay();
-      }, 500);
+      }, 1000);
 
-      // Method 1: tg.Serverless.call (official Telegram Cloud RPC)
-      if (tg?.initData && tg?.Serverless?.call) {
+      if (!currentUserId) {
+        clearTimeout(safetyTimer);
+        hideLoadingOverlay();
+        return;
+      }
+
+      // Method 1: tgcloud Serverless RPC (Telegram.WebApp.Serverless.call)
+      if (window.Telegram?.WebApp?.Serverless?.call) {
         try {
-          tg.Serverless.call('api', { action: 'get_data', userId: currentUserId }, function (err, result) {
+          window.Telegram.WebApp.Serverless.call('api', { action: 'get_data', userId: currentUserId }, function (err, result) {
             clearTimeout(safetyTimer);
+            hideLoadingOverlay();
             if (!err && result && result.ok) {
               applyServerData(result);
-              return;
-            } else {
-              hideLoadingOverlay();
             }
           });
+          return;
         } catch (e) {
-          console.warn('Serverless call skipped:', e.message);
+          console.warn('Serverless call error:', e);
         }
       }
 
-      // Method 2: Fetch endpoint /api/api with TMA Authorization header
+      // Method 2: Fetch endpoint /api/api
       try {
         const headers = { 'Content-Type': 'application/json' };
         if (tg?.initData) {
@@ -471,6 +492,7 @@
         if (res.ok) {
           const result = await res.json();
           clearTimeout(safetyTimer);
+          hideLoadingOverlay();
           if (result && result.ok) {
             applyServerData(result);
             return;
@@ -478,55 +500,8 @@
         }
       } catch (e) {}
 
-      // Fallback populated with isolated real user data
       clearTimeout(safetyTimer);
-      if (currentUserId === 65807806) {
-        // Mohsen's account
-        applyServerData({
-          user: { tgId: 65807806, channelId: '@theNews_Persian', autoPublish: true, routingPolicy: 'fallback' },
-          keys: [
-            { id: 7, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...6eff', status: 'active', sortOrder: -3, totalTokens: 0 },
-            { id: 8, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...9c88', status: 'active', sortOrder: -3, totalTokens: 0 },
-            { id: 9, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...44c8', status: 'active', sortOrder: -2, totalTokens: 0 },
-            { id: 10, provider: 'c_xkiro', label: 'xkiro (کاستوم)', maskedKey: 'sk-xt-...faab', status: 'active', sortOrder: 1, totalTokens: 0 },
-            { id: 4, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...YadQ', status: 'active', sortOrder: 6, totalTokens: 3871 },
-            { id: 5, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...NN_A', status: 'active', sortOrder: 8, totalTokens: 0 },
-            { id: 1, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...Qouw', status: 'active', sortOrder: 10, totalTokens: 1490 },
-            { id: 6, provider: 'c_apmix', label: 'apmix (کاستوم)', maskedKey: 'apx_li...z6qP', status: 'active', sortOrder: 11, totalTokens: 0 },
-            { id: 2, provider: 'gemini', label: 'GEMINI (اختصاصی)', maskedKey: 'AQ.Ab8...KneA', status: 'dead', sortOrder: 12, totalTokens: 0 },
-          ],
-          sources: [
-            { id: 1, name: 'Digiato', type: 'rss', urlOrHandle: 'https://digiato.com/feed/', enabled: true },
-            { id: 2, name: 'Zoomit', type: 'rss', urlOrHandle: 'https://zoomit.ir/feed/', enabled: true },
-            { id: 3, name: 'کانال دیجیاتو', type: 'telegram', urlOrHandle: '@digiato', enabled: true },
-            { id: 4, name: 'TechCrunch', type: 'rss', urlOrHandle: 'https://techcrunch.com/feed/', enabled: true },
-            { id: 5, name: 'The Verge', type: 'rss', urlOrHandle: 'https://theverge.com/rss/index.xml', enabled: true },
-            { id: 6, name: 'BBC Tech', type: 'rss', urlOrHandle: 'https://feeds.bbci.co.uk/news/technology/rss.xml', enabled: true },
-            { id: 7, name: 'BBC Persian', type: 'rss', urlOrHandle: 'https://feeds.bbci.co.uk/persian/rss.xml', enabled: true },
-            { id: 8, name: '@mamlekate', type: 'telegram', urlOrHandle: '@mamlekate', enabled: true },
-            { id: 9, name: '@HutNewsPlus', type: 'telegram', urlOrHandle: '@HutNewsPlus', enabled: true },
-            { id: 10, name: '@Sermoviechannel', type: 'telegram', urlOrHandle: '@Sermoviechannel', enabled: true },
-            { id: 11, name: '@economy_irani', type: 'telegram', urlOrHandle: '@economy_irani', enabled: true },
-            { id: 12, name: '@bbcpersian', type: 'telegram', urlOrHandle: '@bbcpersian', enabled: true },
-            { id: 13, name: '@america', type: 'telegram', urlOrHandle: '@america', enabled: true },
-            { id: 18, name: '@rss_ai_ir', type: 'telegram', urlOrHandle: '@rss_ai_ir', enabled: true }
-          ],
-          customProviders: [
-            { id: 1, name: 'apmix', slug: 'c_1793230703109', defaultModel: 'glm-5.3-flash-free', baseUrl: 'https://api.apmix.ai/v1' },
-            { id: 2, name: 'xkiro', slug: 'c_1793232502790', defaultModel: 'qwen/qwen3.8-max:free', baseUrl: 'https://api.xkiro.com/v1' }
-          ],
-          tokenStats: { allTime: 3290 }
-        });
-      } else {
-        // Any other user: clean isolated empty dashboard
-        applyServerData({
-          user: { tgId: currentUserId, channelId: '', autoPublish: false, routingPolicy: 'fallback' },
-          keys: [],
-          sources: [],
-          customProviders: [],
-          tokenStats: { allTime: 0 }
-        });
-      }
+      hideLoadingOverlay();
     }
 
     // Tab Switcher
@@ -661,6 +636,7 @@
         appState.keys[idx + 1] = tmp;
       }
       renderKeys();
+      callServerless('move_key', { keyId: id, direction: dir });
       showToast('اولویت کلید به‌روزرسانی شد');
     }
 
@@ -668,6 +644,7 @@
       haptic('medium');
       appState.keys = appState.keys.filter(k => k.id !== id);
       renderKeys();
+      callServerless('delete_key', { keyId: id });
       showToast('کلید از استخر حذف شد');
     }
 
@@ -711,6 +688,7 @@
       if (s) {
         s.enabled = !s.enabled;
         renderSources();
+        callServerless('toggle_source', { sourceId: id });
         showToast(s.enabled ? 'منبع فعال شد' : 'منبع موقتاً غیرفعال شد');
       }
     }
@@ -719,6 +697,7 @@
       haptic('medium');
       appState.sources = appState.sources.filter(x => x.id !== id);
       renderSources();
+      callServerless('delete_source', { sourceId: id });
       showToast('منبع حذف شد');
     }
 
@@ -764,6 +743,7 @@
       appState.user.routingPolicy = pol;
       const names = { fallback: 'فالبک اولویتی', round_robin: 'راند رابین', smart_router: 'اسمارت روتر' };
       document.getElementById('statRouterPolicy').innerText = names[pol] || pol;
+      callServerless('update_settings', { routingPolicy: pol });
       showToast('استراتژی با موفقیت تغییر کرد');
     }
 
@@ -773,6 +753,7 @@
       if (newCh && newCh.trim()) {
         appState.user.channelId = newCh.trim();
         document.getElementById('dispChannelId').innerText = appState.user.channelId;
+        callServerless('update_settings', { channelId: newCh.trim() });
         showToast('آیدی کانال ثبت شد');
       }
     }
