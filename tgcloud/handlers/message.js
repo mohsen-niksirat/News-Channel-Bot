@@ -58,16 +58,25 @@ export default async function (message) {
       if (payload.action === 'test_keys') {
         await api.sendMessage({
           chat_id: chat.id,
-          text: '⏳ <b>در حال تست سلامت کلیدها از مینی‌اپ...</b>',
+          text: '⏳ <b>در حال تست سلامت کلیدها از مینی‌اپ...</b>\nلطفاً چند لحظه شکیبا باشید.',
           parse_mode: 'HTML',
-        });
-        const rep = await runHealthCheckForUser(from.id);
-        await api.sendMessage({
-          chat_id: chat.id,
-          text: rep.html,
-          parse_mode: 'HTML',
-          reply_markup: healthCheckKeyboard(),
-        });
+        }).catch(() => {});
+
+        try {
+          const rep = await runHealthCheckForUser(from.id);
+          await api.sendMessage({
+            chat_id: chat.id,
+            text: rep.html,
+            parse_mode: 'HTML',
+            reply_markup: healthCheckKeyboard(),
+          });
+        } catch (err) {
+          await api.sendMessage({
+            chat_id: chat.id,
+            text: `❌ خطا در ارزیابی سلامت: ${escHtml(err.message)}`,
+            reply_markup: healthCheckKeyboard(),
+          });
+        }
         return;
       }
       if (payload.action === 'toggle_autopub') {

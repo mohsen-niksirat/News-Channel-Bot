@@ -24,15 +24,32 @@ import { runScanForUser } from 'lib/scanner';
 
 export default async function (input, ctx) {
   const action = input?.action || 'get_data';
-  const userId = parseInt(input?.userId || input?.uid || input?.id || 0, 10);
+  const userId =
+    ctx?.initData?.user?.id ||
+    parseInt(input?.userId || input?.uid || input?.id || 0, 10);
 
   if (!userId) {
     return { ok: false, error: 'User ID is required' };
   }
 
-  const user = await getUser(userId);
+  let user = await getUser(userId);
   if (!user) {
-    return { ok: false, error: 'User not found in system' };
+    return {
+      ok: true,
+      user: {
+        tgId: userId,
+        channelId: '',
+        autoPublish: false,
+        routingPolicy: 'fallback',
+        preferredProvider: 'gemini',
+        footerText: '',
+      },
+      keys: [],
+      sources: [],
+      customProviders: [],
+      tokenStats: { today: { total: 0 }, allTime: 0 },
+      drafts: [],
+    };
   }
 
   // 1. Get complete dashboard data
