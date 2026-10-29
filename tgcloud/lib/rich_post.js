@@ -128,11 +128,15 @@ export function buildPostButtons({ sourceUrl, sourceName, summaryToCopy, channel
     });
   }
   if (summaryToCopy) {
-    // Bot API 10.3 copy_text button
-    row1.push({
-      text: '📋 کپی خلاصه',
-      copy_text: { text: summaryToCopy },
-    });
+    // Telegram Bot API limit: copy_text.text MUST be 1-256 characters!
+    const cleanCopy = stripAllHtml(summaryToCopy).trim();
+    if (cleanCopy.length > 0) {
+      const truncated = cleanCopy.length > 250 ? cleanCopy.slice(0, 247) + '...' : cleanCopy;
+      row1.push({
+        text: '📋 کپی خلاصه',
+        copy_text: { text: truncated },
+      });
+    }
   }
   if (row1.length > 0) buttons.push(row1);
 
@@ -185,7 +189,13 @@ export async function sendRichPostSafe({
       });
     }
   } catch (err1) {
-    console.warn(`sendRichPostSafe: First attempt failed (${err1.message}), retrying with basic HTML...`);
+    console.warn(`sendRichPostSafe: First attempt failed (${err1.message}), retrying...`);
+
+    // If buttons caused failure, drop them on retries
+    let retryButtons = buttons;
+    if (err1.message && err1.message.includes('BUTTON_')) {
+      retryButtons = undefined;
+    }
 
     // Attempt 2: Basic HTML (strip expandable blockquote / complex tags)
     try {
@@ -196,20 +206,20 @@ export async function sendRichPostSafe({
           photo: imageUrl,
           caption: basicHtml,
           parse_mode: 'HTML',
-          reply_markup: buttons || undefined,
+          reply_markup: retryButtons || undefined,
         });
       } else {
         return await api.sendMessage({
           chat_id: chatId,
           text: basicHtml,
           parse_mode: 'HTML',
-          reply_markup: buttons || undefined,
+          reply_markup: retryButtons || undefined,
         });
       }
     } catch (err2) {
       console.warn(`sendRichPostSafe: Second attempt failed (${err2.message}), retrying with plain text...`);
 
-      // Attempt 3: Plain text guaranteed delivery
+      // Attempt 3: Plain text guaranteed delivery without buttons
       const plain = stripAllHtml(safeContent);
       if (isPhoto) {
         try {
@@ -217,14 +227,14 @@ export async function sendRichPostSafe({
             chat_id: chatId,
             photo: imageUrl,
             caption: plain,
-            reply_markup: buttons || undefined,
+            reply_markup: undefined,
           });
         } catch {}
       }
       return await api.sendMessage({
         chat_id: chatId,
         text: plain,
-        reply_markup: buttons || undefined,
+        reply_markup: undefined,
       });
     }
   }

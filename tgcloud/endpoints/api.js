@@ -19,9 +19,13 @@ import {
   deleteAiKey,
   toggleSource,
   deleteSource,
+  getPostById,
+  markPostPublished,
+  markPostRejected,
 } from 'lib/db';
 import { runHealthCheckForUser } from 'lib/health_check';
 import { runScanForUser } from 'lib/scanner';
+import { buildPostButtons, sendRichPostSafe, escHtml } from 'lib/rich_post';
 
 export default async function (input, ctx) {
   const action = input?.action || 'get_data';
@@ -177,6 +181,88 @@ export default async function (input, ctx) {
       await deleteCustomProvider(provId, userId);
       return { ok: true, message: 'Custom provider deleted' };
     }
+  }
+
+  // 9. Publish Draft Post
+  if (action === 'publish_draft' || action === 'publish_post') {
+    const postId = parseInt(input.postId || input.id, 10);
+    if (!postId) {
+      return { ok: false, error: 'شناسه پست الزامی است.' };
+    }
+
+    const post = await getPostById(postId);
+    if (!post) {
+      return { ok: false, error: 'پست یافت نشد.' };
+    }
+    if (post.userId && post.userId !== userId) {
+      return { ok: false, error: 'شما دسترسی به این پست ندارید.' };
+    }
+    if (post.status === 'published') {
+      return { ok: false, error: 'این پست قبلاً در کانال منتشر شده است.' };
+    }
+
+    if (!user.channelId) {
+      return { ok: false, error: 'کانال مقصد ست نشده است. لطفاً ابتدا از تب داشبورد آیدی کانال را تنظیم کنید.' };
+    }
+
+    // Prepare HTML content with updated footer if needed
+    let postHtml = post.formattedHtml;
+    if (user.footerText && postHtml && postHtml.includes('──────────────\n')) {
+      postHtml = postHtml.split('──────────────\n')[0] + '──────────────\n' + user.footerText;
+    }
+
+    const buttons = buildPostButtons({
+      sourceUrl: post.sourceUrl,
+      sourceName: post.sourceName,
+      summaryToCopy: post.aiSummary,
+      channelUsername: user.channelId,
+    });
+
+    try {
+      const sent = await sendRichPostSafe({
+        chatId: user.channelId,
+        postHtml: postHtml,
+        imageUrl: post.imageUrl,
+        buttons,
+      });
+
+      if (sent && sent.message_id) {
+        await markPostPublished(postId, sent.message_id);
+        await updateUser(userId, { postsPublishedCount: (user.postsPublishedCount || 0) + 1 });
+        return { ok: true, messageId: sent.message_id };
+      } else {
+        return {
+          ok: false,
+          error: `خطا در ارسال پست به کانال ${user.channelId}! لطفاً مطمئن شوید ربات در کانال عضو و ادمین با دسترسی ارسال پیام است.`,
+        };
+      }
+    } catch (sendErr) {
+      console.error('Publish draft failed:', sendErr);
+      return {
+        ok: false,
+        error: `خطا در انتشار: ${sendErr.message || 'نامشخص'}`,
+      };
+    }
+  }
+
+  // 10. Reject Draft Post
+  if (action === 'reject_draft' || action === 'reject_post') {
+    const postId = parseInt(input.postId || input.id, 10);
+    if (!postId) {
+      return { ok: false, error: 'شناسه پست الزامی است.' };
+    }
+    await markPostRejected(postId);
+    return { ok: true, message: 'Draft rejected' };
+  }
+
+  // 11. Delete Source
+  if (action === 'delete_source') {
+    const sourceId = parseInt(input.sourceId, 10);
+    if (sourceId) {
+      await deleteSource(sourceId, userId);
+      return { ok: true, message: 'Source deleted' };
+    }
+    return { ok: false, error: 'شناسه منبع نامعتبر است.' };
   }
 
   return { ok: false, error: 'Unknown action' };

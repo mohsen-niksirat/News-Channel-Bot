@@ -342,17 +342,57 @@
       currentUserId = null; // Strictly isolated, no hardcoded fallbacks
     }
 
-    // Helper to invoke Serverless RPC actions
-    function callServerless(action, payload = {}) {
-      if (!currentUserId) return;
+    // Safe base64 encoder for UTF-8 strings
+    function safeBtoa(str) {
+      try {
+        return window.btoa(unescape(encodeURIComponent(str || '')));
+      } catch (e) {
+        try {
+          return window.btoa(str || '');
+        } catch {
+          return '';
+        }
+      }
+    }
+
+    // Helper to invoke Serverless RPC actions with dual fallback
+    async function callServerless(action, payload = {}) {
+      if (!currentUserId) return { ok: false, error: 'User ID not set' };
+
+      // Method 1: Telegram WebApp Serverless RPC
       if (window.Telegram?.WebApp?.Serverless?.call) {
         try {
-          window.Telegram.WebApp.Serverless.call('api', { action, ...payload, userId: currentUserId }, function (err, res) {
-            if (err) console.warn('Serverless action error:', err);
+          const rpcRes = await new Promise((resolve) => {
+            window.Telegram.WebApp.Serverless.call('api', { action, ...payload, userId: currentUserId }, function (err, res) {
+              if (err) resolve(null);
+              else resolve(res);
+            });
           });
+          if (rpcRes) return rpcRes;
         } catch (e) {
-          console.warn('Serverless call failed:', e);
+          console.warn('Serverless.call failed, falling back to HTTP fetch:', e);
         }
+      }
+
+      // Method 2: Standard fetch /api/api
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (tg?.initData) {
+          headers['Authorization'] = 'TMA ' + safeBtoa(tg.initData);
+        }
+        const res = await fetch('/api/api', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ action, ...payload, userId: currentUserId }),
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          return { ok: false, error: `HTTP ${res.status}: ${errText}` };
+        }
+        return await res.json();
+      } catch (fetchErr) {
+        console.error('callServerless fetch error:', fetchErr);
+        return { ok: false, error: fetchErr.message || 'Network error' };
       }
     }
 
@@ -482,7 +522,7 @@
       try {
         const headers = { 'Content-Type': 'application/json' };
         if (tg?.initData) {
-          headers['Authorization'] = 'TMA ' + window.btoa(tg.initData);
+          headers['Authorization'] = 'TMA ' + safeBtoa(tg.initData);
         }
         const res = await fetch('/api/api', {
           method: 'POST',
@@ -824,25 +864,89 @@
           <h4 class="font-bold text-xs text-white leading-snug">${d.aiTitle || d.title}</h4>
           <p class="text-[11px] text-slate-300 font-light leading-relaxed">${d.aiSummary || d.summary}</p>
           <div class="pt-2 flex items-center gap-2 border-t border-white/5">
-            <button onclick="publishDraft(${d.id})" class="flex-1 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs">✅ انتشار در کانال</button>
-            <button onclick="rejectDraft(${d.id})" class="px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs font-bold">❌ رد</button>
+            <button onclick="publishDraft(${d.id}, this)" class="flex-1 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-xs transition-all flex items-center justify-center gap-1">
+              <span>✅</span>
+              <span>انتشار در کانال</span>
+            </button>
+            <button onclick="rejectDraft(${d.id}, this)" class="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-red-400 text-xs font-bold transition-all">
+              ❌ رد
+            </button>
           </div>
         </div>
       `).join('');
     }
 
-    function publishDraft(id) {
-      haptic('success');
-      appState.drafts = appState.drafts.filter(d => d.id !== id);
-      renderDrafts();
-      showToast('پست در کانال منتشر شد! 🚀');
+    async function publishDraft(id, btn) {
+      haptic('medium');
+      const origContent = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="inline-block animate-spin text-sm">⏳</span><span>در حال ارسال به کانال...</span>';
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+      }
+
+      try {
+        const res = await callServerless('publish_draft', { postId: id });
+        if (res && res.ok) {
+          haptic('success');
+          appState.drafts = appState.drafts.filter(d => d.id !== id);
+          renderDrafts();
+          showToast('پست با موفقیت در کانال منتشر شد! 🚀');
+        } else {
+          haptic('error');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origContent;
+            btn.classList.remove('opacity-75', 'cursor-not-allowed');
+          }
+          const errMsg = res?.error || 'خطا در ارسال پست به کانال';
+          showToast(errMsg, '❌');
+          alert('خطا در انتشار:\n' + errMsg);
+        }
+      } catch (err) {
+        haptic('error');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origContent;
+          btn.classList.remove('opacity-75', 'cursor-not-allowed');
+        }
+        showToast('خطای شبکه در ارتباط با سرور', '❌');
+      }
     }
 
-    function rejectDraft(id) {
+    async function rejectDraft(id, btn) {
       haptic('light');
-      appState.drafts = appState.drafts.filter(d => d.id !== id);
-      renderDrafts();
-      showToast('پیش‌نویس رد شد');
+      const origText = btn ? btn.innerText : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = '⏳...';
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+      }
+
+      try {
+        const res = await callServerless('reject_draft', { postId: id });
+        if (res && res.ok) {
+          haptic('light');
+          appState.drafts = appState.drafts.filter(d => d.id !== id);
+          renderDrafts();
+          showToast('پیش‌نویس رد شد 🗑️');
+        } else {
+          haptic('error');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = origText;
+            btn.classList.remove('opacity-75', 'cursor-not-allowed');
+          }
+          showToast(res?.error || 'خطا در رد پیش‌نویس', '❌');
+        }
+      } catch (err) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = origText;
+          btn.classList.remove('opacity-75', 'cursor-not-allowed');
+        }
+        showToast('خطای شبکه', '❌');
+      }
     }
 
     function saveRoutingPolicy(pol) {
