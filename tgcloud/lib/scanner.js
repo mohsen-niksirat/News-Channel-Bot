@@ -53,15 +53,23 @@ export async function runScanForUser(userId, chatId = null) {
   }
 
   const sourcesList = await getUserSources(userId);
-  // Prioritize active RSS sources first as they respond in <200ms
-  const activeSources = sourcesList
-    .filter((s) => s.enabled)
-    .sort((a, b) => (a.type === 'rss' ? -1 : 1));
+  const activeSources = sourcesList.filter((s) => s.enabled);
+
+  // Balanced Interleaving: Alternate between Telegram channels and RSS sources
+  // so Telegram sources get equal priority and are never starved!
+  const tgSources = activeSources.filter((s) => s.type === 'telegram');
+  const rssSources = activeSources.filter((s) => s.type === 'rss');
+  const balancedSources = [];
+  const maxLen = Math.max(tgSources.length, rssSources.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (i < tgSources.length) balancedSources.push(tgSources[i]);
+    if (i < rssSources.length) balancedSources.push(rssSources[i]);
+  }
 
   const candidateItems = [];
 
   // Harvest unseen items (collect up to 5 items)
-  for (const src of activeSources) {
+  for (const src of balancedSources) {
     if (candidateItems.length >= 5) break;
 
     try {

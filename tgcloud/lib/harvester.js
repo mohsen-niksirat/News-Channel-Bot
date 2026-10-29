@@ -43,12 +43,98 @@ export function cleanText(rawHtml) {
 }
 
 /**
- * Extracts posts from a public Telegram channel via web preview
+ * Parses markdown output from Jina reader proxy for Telegram channels
+ */
+export function parseJinaTelegramMarkdown(md, cleanHandle) {
+  if (!md) return [];
+  const items = [];
+
+  const pattern = /\[\]\((https:\/\/t\.me\/[^\/]+\/(\d+))\)/gi;
+  const matches = [];
+  let m;
+  while ((m = pattern.exec(md)) !== null) {
+    matches.push({
+      postUrl: m[1],
+      msgId: m[2],
+      index: m.index,
+    });
+  }
+
+  for (let i = 0; i < matches.length; i++) {
+    const cur = matches[i];
+    const nextIdx = matches[i + 1] ? matches[i + 1].index : md.length;
+    const chunk = md.substring(cur.index, nextIdx);
+
+    // Image URL extraction (checks nearby text)
+    const preText = md.substring(Math.max(0, cur.index - 350), cur.index);
+    let imageUrl = null;
+    const imgMatch = (preText + chunk).match(/!\[.*?\]\((https:\/\/[^\)]+\.(?:jpg|jpeg|png|webp)[^\)]*)\)/i);
+    if (imgMatch) {
+      imageUrl = imgMatch[1];
+    }
+
+    let plain = chunk
+      .replace(/\[\]\(https:\/\/t\.me\/[^\)]+\)/g, '')
+      .replace(/\[_!\[.*?\]\([^\)]+\)_\]\([^\)]+\)/g, '')
+      .replace(/!\[.*?\]\([^\)]+\)/g, '')
+      .replace(/_\*\*.*?\*\*_/g, '')
+      .replace(/_+\s*\d+\s*_+/g, '')
+      .replace(/\*\*/g, '')
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+      .replace(/(?:October|November|December|January|February|March|April|May|June|July|August|September)\s+\d+/gi, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    plain = plain.replace(/@\w+\s*$/g, '').trim();
+    if (!plain || plain.length < 25) continue;
+
+    const firstLine = plain.split('\n')[0].trim();
+    const title = firstLine.length > 5 ? firstLine.slice(0, 80) : plain.slice(0, 80);
+    const hash = hashString(`${cleanHandle}_${cur.msgId}_${plain.slice(0, 50)}`);
+
+    items.push({
+      sourceType: 'telegram',
+      sourceName: `@${cleanHandle}`,
+      url: cur.postUrl,
+      title,
+      content: plain,
+      imageUrl,
+      hash,
+    });
+  }
+
+  return items;
+}
+
+/**
+ * Extracts posts from a public Telegram channel (Jina reader + t.me fallback)
  */
 export async function harvestTelegramChannel(channelHandle, maxPosts = 2) {
   const cleanHandle = channelHandle.replace(/^@/, '').replace(/^(?:https?:\/\/)?(?:t\.me|telegram\.me)\/(?:s\/)?/i, '').trim();
-  const url = `https://t.me/s/${cleanHandle}`;
 
+  // Method 1: Jina Reader Proxy (Bypasses Telegram Serverless egress restrictions on t.me)
+  try {
+    const jinaUrl = `https://r.jina.ai/https://t.me/s/${cleanHandle}`;
+    const res = await fetch(jinaUrl, {
+      headers: {
+        'Accept': 'text/plain',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsStudio/1.0',
+      },
+    });
+
+    if (res.ok) {
+      const text = await res.text();
+      const items = parseJinaTelegramMarkdown(text, cleanHandle);
+      if (items.length > 0) {
+        return items.slice(-maxPosts);
+      }
+    }
+  } catch (jinaErr) {
+    console.warn(`Jina proxy harvest failed for @${cleanHandle}:`, jinaErr.message);
+  }
+
+  // Method 2: Direct t.me/s web preview (Fallback for non-serverless environments)
+  const url = `https://t.me/s/${cleanHandle}`;
   try {
     const res = await fetch(url, {
       headers: {
@@ -58,6 +144,7 @@ export async function harvestTelegramChannel(channelHandle, maxPosts = 2) {
     });
 
     if (!res.ok) {
+      console.warn(`harvestTelegramChannel: direct fetch ${url} returned HTTP ${res.status}`);
       return [];
     }
 
@@ -102,7 +189,8 @@ export async function harvestTelegramChannel(channelHandle, maxPosts = 2) {
     }
 
     return items.slice(-maxPosts);
-  } catch {
+  } catch (err) {
+    console.error(`harvestTelegramChannel: direct exception for ${url}:`, err.message);
     return [];
   }
 }

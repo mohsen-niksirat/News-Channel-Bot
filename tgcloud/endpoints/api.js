@@ -3,7 +3,7 @@
  * Endpoint URL: https://cloud.telegram.org/<APP_ID>/endpoints/api
  */
 
-import { db, api } from 'sdk';
+import { db, api, fetch } from 'sdk';
 import { eq, and } from 'sdk/db';
 import { users, aiKeys, sources, customProviders } from 'schema';
 import {
@@ -23,6 +23,7 @@ import {
   markPostPublished,
   markPostRejected,
 } from 'lib/db';
+import { harvestTelegramChannel, harvestRssFeed } from 'lib/harvester';
 import { runHealthCheckForUser } from 'lib/health_check';
 import { runScanForUser } from 'lib/scanner';
 import { buildPostButtons, sendRichPostSafe, escHtml } from 'lib/rich_post';
@@ -265,6 +266,17 @@ export default async function (input, ctx) {
       return { ok: true, message: 'Source deleted' };
     }
     return { ok: false, error: 'شناسه منبع نامعتبر است.' };
+  }
+
+  // 12. Test Harvest
+  if (action === 'test_harvest') {
+    const handle = input.handle || '@digiato';
+    try {
+      const items = await harvestTelegramChannel(handle, 2);
+      return { ok: true, count: items.length, items };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
   }
 
   return { ok: false, error: 'Unknown action' };
