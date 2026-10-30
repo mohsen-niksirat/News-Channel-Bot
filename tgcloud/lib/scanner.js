@@ -66,12 +66,9 @@ export async function runScanForUser(userId, chatId = null) {
     if (i < rssSources.length) balancedSources.push(rssSources[i]);
   }
 
-  const candidateItems = [];
-
-  // Harvest unseen items (collect up to 5 items)
-  for (const src of balancedSources) {
-    if (candidateItems.length >= 5) break;
-
+  // Fetch sources in parallel (top 6-8 sources) to stay well under cloud execution timeout
+  const sourcesToScan = balancedSources.slice(0, 8);
+  const harvestPromises = sourcesToScan.map(async (src) => {
     try {
       let harvested = [];
       if (src.type === 'rss') {
@@ -79,16 +76,24 @@ export async function runScanForUser(userId, chatId = null) {
       } else {
         harvested = await harvestTelegramChannel(src.urlOrHandle, 2);
       }
+      return { src, items: Array.isArray(harvested) ? harvested : [] };
+    } catch (err) {
+      console.warn(`Source harvest failed for ${src.name}:`, err.message);
+      return { src, items: [] };
+    }
+  });
 
-      for (const item of harvested) {
-        if (candidateItems.length >= 5) break;
-        const exists = await isPostAlreadyHarvested(userId, item.hash);
-        if (!exists && !candidateItems.some((c) => c.hash === item.hash)) {
-          candidateItems.push({ ...item, category: src.category });
-        }
+  const harvestResults = await Promise.all(harvestPromises);
+  const candidateItems = [];
+
+  for (const { src, items } of harvestResults) {
+    if (candidateItems.length >= 5) break;
+    for (const item of items) {
+      if (candidateItems.length >= 5) break;
+      const exists = await isPostAlreadyHarvested(userId, item.hash);
+      if (!exists && !candidateItems.some((c) => c.hash === item.hash)) {
+        candidateItems.push({ ...item, category: src.category });
       }
-    } catch (srcErr) {
-      console.warn(`Source harvest failed for ${src.name}:`, srcErr.message);
     }
   }
 

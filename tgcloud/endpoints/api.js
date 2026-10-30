@@ -268,16 +268,5 @@ export default async function (input, ctx) {
     return { ok: false, error: 'شناسه منبع نامعتبر است.' };
   }
 
-  // 12. Test Harvest
-  if (action === 'test_harvest') {
-    const handle = input.handle || '@digiato';
-    try {
-      const items = await harvestTelegramChannel(handle, 2);
-      return { ok: true, count: items.length, items };
-    } catch (e) {
-      return { ok: false, error: e.message };
-    }
-  }
-
   return { ok: false, error: 'Unknown action' };
 }
