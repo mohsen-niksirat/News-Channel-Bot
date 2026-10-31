@@ -1,6 +1,7 @@
 import { db } from 'sdk';
 import { users } from 'schema';
 import { runScanForUser } from 'lib/scanner';
+import { isInsideScheduleWindow } from 'lib/schedule';
 
 export default async function (input, ctx) {
   console.log('cron: started with input', JSON.stringify(input));
@@ -18,13 +19,25 @@ export default async function (input, ctx) {
     for (let i = 0; i < filteredUsers.length; i += BATCH_SIZE) {
       const batch = filteredUsers.slice(i, i + BATCH_SIZE);
       const batchPromises = batch.map(async (u) => {
-        console.log('cron: checking user', u.tgId, 'channel:', u.channelId, 'autoPublish:', u.autoPublish);
-        if (u.channelId && u.autoPublish) {
+        console.log('cron: checking user', u.tgId, 'channel:', u.channelId, 'autoPublish:', u.autoPublish, 'scheduleWindows:', u.scheduleWindows);
+
+        // Schedule window calculation (Asia/Tehran)
+        const insideWindow = isInsideScheduleWindow(u.scheduleWindows);
+        const draftOnly = !insideWindow;
+
+        if (u.channelId && (u.autoPublish || u.scheduleWindows)) {
           try {
-            console.log('cron: calling runScanForUser for', u.tgId);
-            await runScanForUser(u.tgId, null);
+            console.log(`cron: calling runScanForUser for ${u.tgId} (insideWindow=${insideWindow}, draftOnly=${draftOnly})`);
+            await runScanForUser(u.tgId, null, { draftOnly });
             console.log('cron: finished runScanForUser for', u.tgId);
-            return { tgId: u.tgId, channel: u.channelId, auto: true, status: 'scanned' };
+            return {
+              tgId: u.tgId,
+              channel: u.channelId,
+              auto: Boolean(u.autoPublish),
+              insideWindow,
+              draftOnly,
+              status: 'scanned',
+            };
           } catch (err) {
             console.error('cron: scan error for', u.tgId, err.message);
             return { tgId: u.tgId, channel: u.channelId, error: err.message };

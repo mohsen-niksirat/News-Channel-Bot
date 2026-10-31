@@ -4,7 +4,7 @@
   "description": "AI-Powered Telegram News Studio & Channel Manager with Multi-Provider AI Router and Rasa Rich Post Engine",
   "type": "module",
   "scripts": {
-    "test": "node --import ./tests/register.js --test tests/harvester.test.js tests/ai_router.test.js tests/scanner.test.js tests/tones.test.js",
+    "test": "node --import ./tests/register.js --test tests/harvester.test.js tests/ai_router.test.js tests/scanner.test.js tests/tones.test.js tests/schedule.test.js tests/categories.test.js",
     "build:app": "node -e \"require('fs').copyFileSync('app.html', 'dist/index.html')\"",
     "push": "tgcloud push",
     "migrate": "tgcloud migrate"

@@ -16,6 +16,7 @@ export const users = table('users', {
   expandableQuotes:    boolean('expandable_quotes').default(true), // Use Bot API 10.3 expandable blockquotes
   toneProfile:         text('tone_profile').default('standard'),
   toneCustom:          text('tone_custom'),
+  scheduleWindows:     text('schedule_windows'),
   state:               text('state').default('idle'),
   stateData:           text('state_data'),
   postsPublishedCount: integer('posts_published_count').default(0),
@@ -32,6 +33,7 @@ export const sources = table('sources', {
   urlOrHandle:   text('url_or_handle').notNull(),// '@digiato' or 'https://zoomit.ir/feed/'
   lang:          text('lang').default('fa'),     // 'fa' or 'en'
   category:      text('category').default('tech'),
+  categories:    text('categories'),
   enabled:       boolean('enabled').default(true),
   lastScannedAt: integer('last_scanned_at'),
   createdAt:     integer('created_at').default(sql`(unixepoch())`),

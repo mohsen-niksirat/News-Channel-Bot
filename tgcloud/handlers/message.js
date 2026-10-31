@@ -5,6 +5,7 @@ import {
   updateUser,
   setUserState,
   getUserSources,
+  updateUserScheduleWindows,
   addSource,
   addAiKey,
   getAiKeys,
@@ -32,12 +33,14 @@ import {
   sourcesManagementKeyboard,
   aiSettingsKeyboard,
   channelSettingsKeyboard,
+  scheduleSettingsKeyboard,
   healthCheckKeyboard,
   adminStatsKeyboard,
   toneSelectionKeyboard,
   backToMenuKeyboard,
 } from 'lib/keyboards';
 import { TONE_PROFILES } from 'lib/tones';
+import { isValidTimeFormat, parseScheduleWindows, formatScheduleWindowsPersian } from 'lib/schedule';
 
 export default async function (message) {
   if (!message || !message.chat) return;
@@ -193,6 +196,36 @@ export default async function (message) {
           `از این پس تمامی اخبار با این سبک شخصی‌سازی بازنویسی خواهند شد.`,
         parse_mode: 'HTML',
         reply_markup: toneSelectionKeyboard(updatedUser),
+      });
+      return;
+    }
+
+    // Setting Schedule Time Window
+    if (user.state === 'awaiting_schedule_time') {
+      const timeCandidate = text.trim();
+      if (!isValidTimeFormat(timeCandidate)) {
+        await api.sendMessage({
+          chat_id: chat.id,
+          text: '⚠️ فرمت ساعت نامعتبر است. لطفاً ساعت را در قالب ۲۴ ساعته ارسال کنید (مثلاً <code>09:30</code> یا <code>18:00</code>):',
+          parse_mode: 'HTML',
+          reply_markup: backToMenuKeyboard(),
+        });
+        return;
+      }
+
+      const current = parseScheduleWindows(user.scheduleWindows) || [];
+      if (!current.includes(timeCandidate)) {
+        current.push(timeCandidate);
+      }
+      await updateUserScheduleWindows(from.id, current);
+      await setUserState(from.id, 'idle');
+      const updatedUser = await getUser(from.id);
+
+      await api.sendMessage({
+        chat_id: chat.id,
+        text: `✅ ساعت <b>${timeCandidate}</b> (به وقت تهران) به برنامه زمان‌بندی انتشار کانال افزوده شد.`,
+        parse_mode: 'HTML',
+        reply_markup: scheduleSettingsKeyboard(updatedUser),
       });
       return;
     }
@@ -468,6 +501,47 @@ export default async function (message) {
       text: report.html,
       parse_mode: 'HTML',
       reply_markup: healthCheckKeyboard(),
+    });
+    return;
+  }
+
+  // 5.8. Schedule Command
+  if (text === '/schedule' || text.startsWith('/schedule ') || text === '⏱️ زمان‌بندی ساعات انتشار') {
+    const arg = text.startsWith('/schedule ') ? text.replace('/schedule ', '').trim() : '';
+    if (arg) {
+      if (isValidTimeFormat(arg)) {
+        const current = parseScheduleWindows(user.scheduleWindows) || [];
+        if (!current.includes(arg)) {
+          current.push(arg);
+          await updateUserScheduleWindows(from.id, current);
+          user.scheduleWindows = JSON.stringify(current);
+        }
+        await api.sendMessage({
+          chat_id: chat.id,
+          text: `✅ ساعت <b>${arg}</b> (به وقت تهران) به برنامه زمان‌بندی انتشار کانال افزوده شد.`,
+          parse_mode: 'HTML',
+          reply_markup: scheduleSettingsKeyboard(user),
+        });
+        return;
+      } else {
+        await api.sendMessage({
+          chat_id: chat.id,
+          text: '⚠️ فرمت ساعت نامعتبر است. لطفاً به صورت ۲۴ ساعته ارسال کنید (مثلاً <code>/schedule 09:30</code>).',
+          parse_mode: 'HTML',
+        });
+        return;
+      }
+    }
+
+    const windowsText = formatScheduleWindowsPersian(user.scheduleWindows);
+    await api.sendMessage({
+      chat_id: chat.id,
+      text:
+        `⏱️ <b>تنظیم ساعات انتشار خودکار (بر اساس افق تهران):</b>\n\n` +
+        `وضعیت فعلی: <b>${escHtml(windowsText)}</b>\n\n` +
+        `💡 <i>نکته: در صورت تنظیم ساعات، اسکن در تمام ساعات انجام شده و پیش‌نویس‌ها آماده می‌شوند، اما انتشار خودکار در کانال فقط در این ساعات مشخص (با تقریب ۱۰± دقیقه) انجام می‌شود.</i>`,
+      parse_mode: 'HTML',
+      reply_markup: scheduleSettingsKeyboard(user),
     });
     return;
   }
