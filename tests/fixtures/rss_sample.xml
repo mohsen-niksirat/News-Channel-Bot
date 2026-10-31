@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Zoomit Feed</title>
+    <link>https://www.zoomit.ir</link>
+    <description>Latest tech news from Zoomit</description>
+    <item>
+      <title>معرفی نوکیا ۲۳۶۰ فلیپ با امکانات امنیتی جدید</title>
+      <link>https://www.zoomit.ir/mobile/470135-nokia-2360-flip-announced/</link>
+      <description><![CDATA[شرکت HMD از گوشی تاشدنی ساده نوکیا ۲۳۶۰ با قابلیت‌های اضطراری رونمایی کرد.]]></description>
+      <pubDate>Fri, 30 Oct 2026 12:00:00 +0330</pubDate>
+      <enclosure url="https://api2.zoomit.ir/media/nokia.jpg" type="image/jpeg" />
+    </item>
+    <item>
+      <title>تایمکس با ساعت‌های کریستالی سری آدیسون بازگشت</title>
+      <link>https://www.zoomit.ir/wearables/470133-timex-addison-tw2y90-watch-launch/</link>
+      <description><![CDATA[برند تایمکس از کالکشن جدید ساعت‌های زنانه مجهز به ۵۰ قطعه کریستال رونمایی به عمل آورد.]]></description>
+      <pubDate>Fri, 30 Oct 2026 13:00:00 +0330</pubDate>
+    </item>
+  </channel>
+</rss>
