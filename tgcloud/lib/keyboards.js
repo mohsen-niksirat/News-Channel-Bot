@@ -41,8 +41,9 @@ export function mainMenuKeyboard(user) {
   };
 }
 
-export function mainReplyKeyboard(userId = null) {
-  const miniAppUrl = 'https://app9260009899.tgcloud.ai/' + (userId ? `?uid=${userId}` : '');
+export function mainReplyKeyboard(userId = ADMIN_ID) {
+  const effectiveId = userId || ADMIN_ID;
+  const miniAppUrl = 'https://app9260009899.tgcloud.ai/?uid=' + effectiveId;
   const rows = [
     [
       { text: '📱 باز کردن مینی‌اپ داشبورد', web_app: { url: miniAppUrl } },

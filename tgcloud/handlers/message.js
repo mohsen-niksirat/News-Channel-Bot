@@ -320,6 +320,18 @@ export default async function (message) {
       text: '👇 نوار دسترسی سریع فعال است:',
       reply_markup: mainReplyKeyboard(from.id),
     });
+
+    try {
+      await api.setChatMenuButton({
+        chat_id: chat.id,
+        menu_button: {
+          type: 'web_app',
+          text: 'داشبورد خبر',
+          web_app: { url: `https://app9260009899.tgcloud.ai/?uid=${from.id}` },
+        },
+      });
+    } catch (e) {}
+
     return;
   }
 
