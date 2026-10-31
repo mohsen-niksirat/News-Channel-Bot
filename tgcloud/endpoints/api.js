@@ -28,7 +28,7 @@ import {
 import { harvestTelegramChannel, harvestRssFeed } from 'lib/harvester';
 import { runHealthCheckForUser } from 'lib/health_check';
 import { runScanForUser } from 'lib/scanner';
-import { buildPostButtons, sendRichPostSafe, escHtml } from 'lib/rich_post';
+import { buildPostButtons, sendRichPostSafe, preparePostForPublishing, escHtml } from 'lib/rich_post';
 
 export default async function (input, ctx) {
   const action = input?.action || 'get_data';
@@ -227,25 +227,16 @@ export default async function (input, ctx) {
       return { ok: false, error: 'کانال مقصد ست نشده است. لطفاً ابتدا از تب داشبورد آیدی کانال را تنظیم کنید.' };
     }
 
-    // Prepare HTML content with updated footer if needed
-    let postHtml = post.formattedHtml;
-    if (user.footerText && postHtml && postHtml.includes('──────────────\n')) {
-      postHtml = postHtml.split('──────────────\n')[0] + '──────────────\n' + user.footerText;
-    }
-
-    const buttons = buildPostButtons({
-      sourceUrl: post.sourceUrl,
-      sourceName: post.sourceName,
-      summaryToCopy: post.aiSummary,
-      channelUsername: user.channelId,
-    });
+    // Fully format the post for channel publication (guarantees headline, summary, source link, divider, and footer tags)
+    const postHtml = preparePostForPublishing({ post, user });
 
     try {
       const sent = await sendRichPostSafe({
         chatId: user.channelId,
         postHtml: postHtml,
         imageUrl: post.imageUrl,
-        buttons,
+        buttons: null,
+        disableWebPagePreview: true,
       });
 
       if (sent && sent.message_id) {
@@ -293,6 +284,8 @@ export default async function (input, ctx) {
       return { ok: false, error: 'دسترسی غیرمجاز: مخصوص مدیریت کل سیستم' };
     }
     const stats = await getAdminPlatformStats();
+    const allUsers = await db.select().from(users).all();
+    stats.userList = allUsers.map(u => ({ id: u.id, tgId: u.tgId, name: u.name, username: u.username, channelId: u.channelId }));
     return { ok: true, stats };
   }
 

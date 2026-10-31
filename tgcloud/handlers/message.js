@@ -46,6 +46,16 @@ export default async function (message) {
   const { user } = await getOrCreateUser(from);
   const text = (message.text || message.caption || '').trim();
 
+  // Ensure Telegram's native Menu Button is bound to user's personalized Mini App URL
+  api.setChatMenuButton({
+    chat_id: chat.id,
+    menu_button: {
+      type: 'web_app',
+      text: 'استودیو خبر 📰',
+      web_app: { url: `https://app9260009899.tgcloud.ai/?uid=${from.id}` },
+    },
+  }).catch(() => {});
+
   // Handle Telegram Mini App Data sent via Telegram.WebApp.sendData(...)
   if (message.web_app_data && message.web_app_data.data) {
     try {

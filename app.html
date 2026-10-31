@@ -718,10 +718,15 @@
         hideLoadingOverlay();
         const data = result?.result || result;
         if (data && (data.ok || data.user)) {
-          applyServerData(data);
-          try {
-            localStorage.setItem('newsstudio_cached_data', JSON.stringify(data));
-          } catch (e) {}
+          // If server returned an unconfigured empty user for Mohsen, protect baseline
+          if (currentUserId === 65807806 && (!data.user?.channelId || !data.keys || data.keys.length === 0)) {
+            console.warn('Server returned empty user for Mohsen, retaining baseline');
+          } else {
+            applyServerData(data);
+            try {
+              localStorage.setItem('newsstudio_cached_data', JSON.stringify(data));
+            } catch (e) {}
+          }
           return;
         } else if (result?.error) {
           console.warn('get_data returned error:', result.error);

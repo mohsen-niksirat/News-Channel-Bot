@@ -108,7 +108,10 @@ export function buildBulletinPost({
 
   post += `──────────────────\n`;
   if (footerText) {
-    post += `${escHtml(footerText)}`;
+    const safeFooter = (footerText.includes('<') && footerText.includes('>'))
+      ? footerText
+      : escHtml(footerText);
+    post += `${safeFooter}`;
   }
 
   return post.trim();
@@ -246,4 +249,71 @@ export async function sendRichPostSafe({
       });
     }
   }
+}
+
+/**
+ * Fully formats a single post for channel publication.
+ * Guarantees headline, summary, source link, divider line,
+ * and the user's custom channel footer tags.
+ */
+export function preparePostForPublishing({ post, user }) {
+  let title = (post?.aiTitle || post?.originalTitle || post?.title || '').trim();
+  let summary = (post?.aiSummary || post?.summary || '').trim();
+  const sourceName = (post?.sourceName || 'منبع').trim();
+  const sourceUrl = (post?.sourceUrl || post?.url || '').trim();
+  const defaultFooter = '📢 کانال خبر : @theNews_Persian\n📢 کانال مرجع: @MyLeitner';
+  const footerText = (user?.footerText || (user?.channelId ? `📢 کانال خبر : ${user.channelId}\n📢 کانال مرجع: @MyLeitner` : defaultFooter)).trim();
+
+  // If title or summary is missing, parse out of formattedHtml if possible
+  if ((!title || !summary) && post?.formattedHtml) {
+    let raw = post.formattedHtml;
+    // Strip existing dividers and footer
+    if (raw.includes('──────────────') || raw.includes('──────────────────')) {
+      raw = raw.split(/──────────────|──────────────────/)[0].trim();
+    }
+    // Strip existing source link if present
+    raw = raw.replace(/🔗\s*<a\s+href="[^"]*">[^<]*<\/a>/gi, '').trim();
+
+    if (!title) {
+      const bMatch = raw.match(/<b>(.*?)<\/b>/i);
+      if (bMatch) {
+        title = stripAllHtml(bMatch[1]).trim();
+        raw = raw.replace(/<b>.*?<\/b>/i, '').trim();
+      }
+    }
+    if (!summary) {
+      summary = stripAllHtml(raw).replace(/^[⚡🔹]\s*/, '').trim();
+    }
+  }
+
+  let body = '';
+  if (title) {
+    body += `🔹 <b>${escHtml(title)}</b>\n\n`;
+  }
+
+  if (summary) {
+    body += `${escHtml(summary)}\n\n`;
+  } else if (post?.formattedHtml) {
+    let clean = post.formattedHtml;
+    if (clean.includes('──────────────') || clean.includes('──────────────────')) {
+      clean = clean.split(/──────────────|──────────────────/)[0].trim();
+    }
+    clean = clean.replace(/🔗\s*<a\s+href="[^"]*">[^<]*<\/a>/gi, '').trim();
+    clean = clean.replace(/^[⚡🔹]\s*/, '').trim();
+    if (clean) {
+      body += `${clean}\n\n`;
+    }
+  }
+
+  if (sourceUrl) {
+    body += `🔗 <a href="${sourceUrl}">مطالعه متن کامل در ${escHtml(sourceName)}</a>\n\n`;
+  }
+
+  const safeFooter = (footerText.includes('<') && footerText.includes('>'))
+    ? footerText
+    : escHtml(footerText);
+
+  body += `──────────────────\n${safeFooter}`;
+
+  return body.trim();
 }

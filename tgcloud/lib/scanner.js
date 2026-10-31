@@ -21,7 +21,7 @@ import {
 } from 'lib/db';
 import { harvestTelegramChannel, harvestRssFeed } from 'lib/harvester';
 import { generateNewsRewrite } from 'lib/ai_router';
-import { buildEditorialPost, buildBulletinPost, buildPostButtons, sendRichPostSafe, escHtml } from 'lib/rich_post';
+import { buildEditorialPost, buildBulletinPost, buildPostButtons, sendRichPostSafe, preparePostForPublishing, escHtml } from 'lib/rich_post';
 import { mainMenuKeyboard, reviewPostKeyboard } from 'lib/keyboards';
 
 export async function runScanForUser(userId, chatId = null) {
@@ -146,14 +146,14 @@ export async function runScanForUser(userId, chatId = null) {
         const aiSummary = sMatch ? sMatch[1].trim() : fullText.slice(0, 180);
         const aiDetails = dMatch ? dMatch[1].trim() : '';
 
-        const formattedHtml = buildEditorialPost({
-          title: aiTitle,
-          summary: aiSummary,
-          deepDive: aiDetails,
-          sourceName: item.sourceName,
-          sourceUrl: item.url,
-          footerText: user.footerText || `📢 ${user.channelId || '@MyLeitner'}`,
-          useExpandable: Boolean(user.expandableQuotes !== 0),
+        const formattedHtml = preparePostForPublishing({
+          post: {
+            aiTitle,
+            aiSummary,
+            sourceName: item.sourceName,
+            sourceUrl: item.url,
+          },
+          user,
         });
 
         const saved = await saveDraftPost({
@@ -173,17 +173,12 @@ export async function runScanForUser(userId, chatId = null) {
 
         // Auto-Publish
         if (user.autoPublish && user.channelId) {
-          const buttons = buildPostButtons({
-            sourceUrl: item.url,
-            sourceName: item.sourceName,
-            summaryToCopy: aiSummary,
-            channelUsername: user.channelId,
-          });
           const sent = await sendRichPostSafe({
             chatId: user.channelId,
             postHtml: formattedHtml,
             imageUrl: item.imageUrl,
-            buttons,
+            buttons: null,
+            disableWebPagePreview: true,
           });
           if (sent && sent.message_id) {
             await markPostPublished(saved.id, sent.message_id);
@@ -252,6 +247,16 @@ export async function runScanForUser(userId, chatId = null) {
         sourceUrl: item.url,
       });
 
+      const itemPostHtml = preparePostForPublishing({
+        post: {
+          aiTitle,
+          aiSummary,
+          sourceName: item.sourceName,
+          sourceUrl: item.url,
+        },
+        user,
+      });
+
       const saved = await saveDraftPost({
         userId: userId,
         sourceName: item.sourceName,
@@ -260,7 +265,7 @@ export async function runScanForUser(userId, chatId = null) {
         originalHash: item.hash,
         aiTitle,
         aiSummary,
-        formattedHtml: `<b>${escHtml(aiTitle)}</b>\n${escHtml(aiSummary)}`,
+        formattedHtml: itemPostHtml,
         imageUrl: item.imageUrl,
         category: item.category,
       });
@@ -278,7 +283,7 @@ export async function runScanForUser(userId, chatId = null) {
   const bulletinHtml = buildBulletinPost({
     bulletinTitle: `🗞️ گزیده مهم‌ترین رویدادها (ساعت ${nowHour})`,
     items: processedItems,
-    footerText: user.footerText || `📢 ${user.channelId || '@MyLeitner'}`,
+    footerText: user.footerText || (user.channelId ? `📢 کانال خبر : ${user.channelId}\n📢 کانال مرجع: @MyLeitner` : '📢 کانال خبر : @theNews_Persian\n📢 کانال مرجع: @MyLeitner'),
   });
 
   // If autoPublish is ON, publish this single bulletin post directly to the channel!

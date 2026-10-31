@@ -24,7 +24,7 @@ import {
 import { runScanForUser } from 'lib/scanner';
 import { generateNewsRewrite, ROUTING_POLICIES } from 'lib/ai_router';
 import { runHealthCheckForUser } from 'lib/health_check';
-import { buildEditorialPost, buildPostButtons, sendRichPostSafe, escHtml } from 'lib/rich_post';
+import { buildEditorialPost, buildPostButtons, sendRichPostSafe, preparePostForPublishing, escHtml } from 'lib/rich_post';
 import {
   mainMenuKeyboard,
   mainReplyKeyboard,
@@ -266,23 +266,15 @@ export default async function (query) {
       return;
     }
 
-    let postHtml = post.formattedHtml;
-    if (user.footerText && postHtml && postHtml.includes('──────────────\n')) {
-      postHtml = postHtml.split('──────────────\n')[0] + '──────────────\n' + user.footerText;
-    }
-
-    const buttons = buildPostButtons({
-      sourceUrl: post.sourceUrl,
-      sourceName: post.sourceName,
-      summaryToCopy: post.aiSummary,
-      channelUsername: user.channelId,
-    });
+    // Fully format the post for channel publication (guarantees headline, summary, source link, divider, and footer tags)
+    const postHtml = preparePostForPublishing({ post, user });
 
     const sent = await sendRichPostSafe({
       chatId: user.channelId,
       postHtml: postHtml,
       imageUrl: post.imageUrl,
-      buttons,
+      buttons: null,
+      disableWebPagePreview: true,
     });
 
     if (sent && sent.message_id) {
