@@ -30,4 +30,4 @@ jobs:
           else
             echo "Warning: TGCLOUD_TOKEN secret is not set yet. Please add it in GitHub Repository Settings -> Secrets and variables -> Actions."
           fi
-          npx @tgcloud/cli run tgcloud/endpoints/cron "{}"
+          npx @tgcloud/cli@^0.2.0 run tgcloud/endpoints/cron "{}"

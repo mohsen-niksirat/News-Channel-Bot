@@ -10,22 +10,37 @@ export default async function (input, ctx) {
     console.log('cron: found users count =', allUsers.length);
     const results = [];
 
-    for (const u of allUsers) {
-      if (targetUserId && u.tgId !== targetUserId) continue;
+    // Filter candidate users
+    const filteredUsers = allUsers.filter(u => !targetUserId || u.tgId === targetUserId);
 
-      console.log('cron: checking user', u.tgId, 'channel:', u.channelId, 'autoPublish:', u.autoPublish);
-      if (u.channelId && u.autoPublish) {
-        try {
-          console.log('cron: calling runScanForUser for', u.tgId);
-          await runScanForUser(u.tgId, null);
-          console.log('cron: finished runScanForUser for', u.tgId);
-          results.push({ tgId: u.tgId, channel: u.channelId, auto: true, status: 'scanned' });
-        } catch (err) {
-          console.error('cron: scan error for', u.tgId, err.message);
-          results.push({ tgId: u.tgId, channel: u.channelId, error: err.message });
+    // Run users in bounded concurrency batches of 2
+    const BATCH_SIZE = 2;
+    for (let i = 0; i < filteredUsers.length; i += BATCH_SIZE) {
+      const batch = filteredUsers.slice(i, i + BATCH_SIZE);
+      const batchPromises = batch.map(async (u) => {
+        console.log('cron: checking user', u.tgId, 'channel:', u.channelId, 'autoPublish:', u.autoPublish);
+        if (u.channelId && u.autoPublish) {
+          try {
+            console.log('cron: calling runScanForUser for', u.tgId);
+            await runScanForUser(u.tgId, null);
+            console.log('cron: finished runScanForUser for', u.tgId);
+            return { tgId: u.tgId, channel: u.channelId, auto: true, status: 'scanned' };
+          } catch (err) {
+            console.error('cron: scan error for', u.tgId, err.message);
+            return { tgId: u.tgId, channel: u.channelId, error: err.message };
+          }
+        } else {
+          return { tgId: u.tgId, status: u.channelId ? 'auto_disabled' : 'no_channel' };
         }
-      } else {
-        results.push({ tgId: u.tgId, status: u.channelId ? 'auto_disabled' : 'no_channel' });
+      });
+
+      const settled = await Promise.allSettled(batchPromises);
+      for (const res of settled) {
+        if (res.status === 'fulfilled') {
+          results.push(res.value);
+        } else {
+          results.push({ error: res.reason?.message || 'Unknown batch error' });
+        }
       }
     }
 

@@ -135,12 +135,36 @@ export async function runScanForUser(userId, chatId = null) {
           preferredModel: user.preferredModel || 'gemini-3.1-flash-lite',
           userId: userId,
           routingPolicy: user.routingPolicy || 'fallback',
+          maxTokens: 1200,
         });
 
-        const fullText = aiRes.text;
-        const tMatch = fullText.match(/\[TITLE\]:?\s*([^\n]+)/i);
-        const sMatch = fullText.match(/\[SUMMARY\]:?\s*([\s\S]*?)(?=\[DETAILS\]|$)/i);
-        const dMatch = fullText.match(/\[DETAILS\]:?\s*([\s\S]*?)$/i);
+        let fullText = aiRes.text;
+        let tMatch = fullText.match(/\[TITLE\]:?\s*([^\n]+)/i);
+        let sMatch = fullText.match(/\[SUMMARY\]:?\s*([\s\S]*?)(?=\[DETAILS\]|$)/i);
+        let dMatch = fullText.match(/\[DETAILS\]:?\s*([\s\S]*?)$/i);
+
+        // One-time retry on format drift if [TITLE] was missing
+        if (!tMatch) {
+          try {
+            const retryRes = await generateNewsRewrite({
+              systemPrompt: 'تو یک روزنامه‌نگار و نویسنده خلاق اخبار هستی. متن را روان، شیوا، فارسی و جذاب بنویس.',
+              userPrompt: prompt + '\n\nمهم: فقط خروجی را دقیقاً در قالب [TITLE]/[SUMMARY]/[DETAILS] بده، بدون هیچ متن اضافه.',
+              preferredProvider: user.preferredAiProvider || 'gemini',
+              preferredModel: user.preferredModel || 'gemini-3.1-flash-lite',
+              userId: userId,
+              routingPolicy: user.routingPolicy || 'fallback',
+              maxTokens: 1200,
+            });
+            const rText = retryRes.text;
+            const rtMatch = rText.match(/\[TITLE\]:?\s*([^\n]+)/i);
+            if (rtMatch) {
+              fullText = rText;
+              tMatch = rtMatch;
+              sMatch = rText.match(/\[SUMMARY\]:?\s*([\s\S]*?)(?=\[DETAILS\]|$)/i);
+              dMatch = rText.match(/\[DETAILS\]:?\s*([\s\S]*?)$/i);
+            }
+          } catch {}
+        }
 
         const aiTitle = tMatch ? tMatch[1].trim() : item.title;
         const aiSummary = sMatch ? sMatch[1].trim() : fullText.slice(0, 180);

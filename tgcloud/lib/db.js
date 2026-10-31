@@ -1,5 +1,5 @@
 import { db } from 'sdk';
-import { eq, and, desc, asc, sql } from 'sdk/db';
+import { eq, and, or, desc, asc, sql } from 'sdk/db';
 import { users, sources, customProviders, aiKeys, tokenUsage, posts } from 'schema';
 
 export const ADMIN_ID = 65807806; // Mohsen Niksirat
@@ -24,8 +24,8 @@ export async function getOrCreateUser(tgUser) {
       name: tgUser.first_name || '',
       username: tgUser.username || '',
       state: 'idle',
-      channelId: '@MyLeitner',
-      footerText: '📢 @MyLeitner',
+      channelId: null,
+      footerText: null,
       routingPolicy: 'fallback',
     })
     .returning()
@@ -34,7 +34,7 @@ export async function getOrCreateUser(tgUser) {
   // Populate default sources for new user
   for (const s of DEFAULT_GLOBAL_SOURCES) {
     await db.insert(sources).values({
-      userId: tgUser.id,
+      userId: created.id,
       name: s.name,
       type: s.type,
       urlOrHandle: s.urlOrHandle,
@@ -66,19 +66,23 @@ export async function setUserState(tgId, state, stateData = null) {
 
 // ---------------- Sources ----------------
 export async function getUserSources(userId) {
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
   return await db
     .select()
     .from(sources)
-    .where(eq(sources.userId, userId))
+    .where(or(eq(sources.userId, userId), eq(sources.userId, targetId)))
     .orderBy(sources.id)
     .all();
 }
 
 export async function addSource(userId, { name, type, urlOrHandle, lang = 'fa', category = 'general' }) {
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
   const [created] = await db
     .insert(sources)
     .values({
-      userId,
+      userId: targetId,
       name,
       type,
       urlOrHandle,
@@ -92,7 +96,9 @@ export async function addSource(userId, { name, type, urlOrHandle, lang = 'fa', 
 }
 
 export async function toggleSource(sourceId, userId) {
-  const row = await db.select().from(sources).where(and(eq(sources.id, sourceId), eq(sources.userId, userId))).get();
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
+  const row = await db.select().from(sources).where(and(eq(sources.id, sourceId), or(eq(sources.userId, userId), eq(sources.userId, targetId)))).get();
   if (!row) return null;
   const newEnabled = !row.enabled;
   await db.update(sources).set({ enabled: newEnabled }).where(eq(sources.id, sourceId)).run();
@@ -100,7 +106,9 @@ export async function toggleSource(sourceId, userId) {
 }
 
 export async function deleteSource(sourceId, userId) {
-  await db.delete(sources).where(and(eq(sources.id, sourceId), eq(sources.userId, userId))).run();
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
+  await db.delete(sources).where(and(eq(sources.id, sourceId), or(eq(sources.userId, userId), eq(sources.userId, targetId)))).run();
 }
 
 // ---------------- Custom Providers ----------------

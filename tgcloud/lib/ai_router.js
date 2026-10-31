@@ -157,7 +157,7 @@ export async function markKeyResult(keyId, success, statusCode = 200) {
 /**
  * Calls Gemini via Google's official OpenAI-compatible endpoint
  */
-async function callGemini(apiKey, model, systemPrompt, userPrompt) {
+async function callGemini(apiKey, model, systemPrompt, userPrompt, maxTokens = 800) {
   const url = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
   const candidateModels = [
     model && !model.includes('1.5') && !model.includes('2.0') && !model.includes('2.5') ? model : 'gemini-3.1-flash-lite',
@@ -182,7 +182,7 @@ async function callGemini(apiKey, model, systemPrompt, userPrompt) {
           model: m,
           messages,
           temperature: 0.3,
-          max_tokens: 800,
+          max_tokens: maxTokens,
         }),
       });
 
@@ -219,7 +219,7 @@ async function callGemini(apiKey, model, systemPrompt, userPrompt) {
 /**
  * Calls any OpenAI-compatible endpoint (Groq, DeepSeek, OpenAI, OpenRouter, Custom Providers)
  */
-async function callOpenAICompatible(baseUrl, apiKey, model, systemPrompt, userPrompt) {
+async function callOpenAICompatible(baseUrl, apiKey, model, systemPrompt, userPrompt, maxTokens = 800) {
   const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
   const messages = [];
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
@@ -235,7 +235,7 @@ async function callOpenAICompatible(baseUrl, apiKey, model, systemPrompt, userPr
       model,
       messages,
       temperature: 0.3,
-      max_tokens: 800,
+      max_tokens: maxTokens,
     }),
   });
 
@@ -269,6 +269,7 @@ export async function generateNewsRewrite({
   preferredModel = null,
   userId = null,
   routingPolicy = 'fallback',
+  maxTokens = 800,
 }) {
   if (!userId) {
     throw new Error('شناسه کاربر جهت استفاده از کلیدهای اختصاصی مشخص نیست');
@@ -302,7 +303,7 @@ export async function generateNewsRewrite({
       try {
         let result = null;
         if (provider === 'gemini') {
-          result = await callGemini(keyRow.apiKey, model, systemPrompt, userPrompt);
+          result = await callGemini(keyRow.apiKey, model, systemPrompt, userPrompt, maxTokens);
         } else {
           let baseUrl = keyRow.baseUrl;
           if (!baseUrl) {
@@ -312,7 +313,7 @@ export async function generateNewsRewrite({
             else if (provider === 'openrouter') baseUrl = 'https://openrouter.ai/api/v1';
             else baseUrl = 'https://api.openai.com/v1';
           }
-          result = await callOpenAICompatible(baseUrl, keyRow.apiKey, model, systemPrompt, userPrompt);
+          result = await callOpenAICompatible(baseUrl, keyRow.apiKey, model, systemPrompt, userPrompt, maxTokens);
         }
 
         if (result && result.text) {
