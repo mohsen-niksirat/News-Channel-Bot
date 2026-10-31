@@ -342,6 +342,7 @@ export async function saveDraftPost({
   formattedHtml,
   imageUrl,
   category = 'tech',
+  importance = null,
 }) {
   const [created] = await db
     .insert(posts)
@@ -356,6 +357,7 @@ export async function saveDraftPost({
       formattedHtml,
       imageUrl,
       category,
+      importance,
       status: 'draft',
     })
     .returning()

@@ -14,6 +14,8 @@ export const users = table('users', {
   routingPolicy:       text('routing_policy').default('fallback'), // 'fallback' | 'round_robin' | 'smart_router' | 'fusion'
   footerText:          text('footer_text').default('📢 @MyLeitner'),
   expandableQuotes:    boolean('expandable_quotes').default(true), // Use Bot API 10.3 expandable blockquotes
+  toneProfile:         text('tone_profile').default('standard'),
+  toneCustom:          text('tone_custom'),
   state:               text('state').default('idle'),
   stateData:           text('state_data'),
   postsPublishedCount: integer('posts_published_count').default(0),
@@ -96,6 +98,7 @@ export const posts = table('posts', {
   formattedHtml:      text('formatted_html'),
   imageUrl:           text('image_url'),
   category:           text('category'),
+  importance:         integer('importance'),
   status:             text('status').default('draft'), // 'draft' | 'published' | 'rejected'
   publishedMessageId: integer('published_message_id'),
   publishedAt:        integer('published_at'),

@@ -38,8 +38,10 @@ import {
   publishModeKeyboard,
   healthCheckKeyboard,
   adminStatsKeyboard,
+  toneSelectionKeyboard,
   backToMenuKeyboard,
 } from 'lib/keyboards';
+import { TONE_PROFILES } from 'lib/tones';
 
 export default async function (query) {
   if (!query || !query.data) return;
@@ -645,6 +647,65 @@ export default async function (query) {
       text: `✅ استراتژی روتر با موفقیت روی <b>${pName}</b> تنظیم شد!`,
       parse_mode: 'HTML',
       reply_markup: aiSettingsKeyboard(updatedUser, keysList, cpList),
+    });
+    return;
+  }
+
+  // Tone Profile Menu
+  if (data === 'm:tone') {
+    const curTone = user.toneProfile || 'standard';
+    const profile = TONE_PROFILES[curTone] || TONE_PROFILES.standard;
+    const customInfo = user.toneCustom ? `\n\n📝 <b>دستور فعلی لحن اختصاصی:</b>\n<i>«${escHtml(user.toneCustom)}»</i>` : '';
+    await api.sendMessage({
+      chat_id: chatId,
+      text:
+        `🎨 <b>تنظیم لحن و شخصیت نگارش اخبار (Channel Personality):</b>\n\n` +
+        `هوش مصنوعی اخبار را مطابق لحن انتخابی شما بازنویسی می‌کند.\n\n` +
+        `• <b>لحن فعال فعلی:</b> ${profile.icon} ${profile.name}\n` +
+        `• <b>توضیحات:</b> ${profile.desc}${customInfo}\n\n` +
+        `👇 <i>یکی از لحن‌های زیر را انتخاب کنید:</i>`,
+      parse_mode: 'HTML',
+      reply_markup: toneSelectionKeyboard(user),
+    });
+    return;
+  }
+
+  if (data.startsWith('set:tone:')) {
+    const toneKey = data.replace('set:tone:', '');
+    if (toneKey === 'custom') {
+      await setUserState(from.id, 'awaiting_custom_tone');
+      await api.sendMessage({
+        chat_id: chatId,
+        text:
+          '✏️ <b>تنظیم لحن و سبک نگارش دلخواه (Custom Tone):</b>\n\n' +
+          'لطفاً سبک و دستور مورد نظر خود را برای هوش مصنوعی ارسال کنید (حداکثر ۳۰۰ کاراکتر).\n\n' +
+          '<i>مثال: «اخبار را با لحن طنز و عامیانه بنویس و از اصطلاحات جذاب جوان‌پسند استفاده کن.»</i>\n\n' +
+          '👇 پیام خود را بنویسید یا برای انصراف /cancel را ارسال کنید:',
+        parse_mode: 'HTML',
+      });
+      return;
+    }
+
+    await updateUser(from.id, { toneProfile: toneKey });
+    const updatedUser = await getUser(from.id);
+    const profile = TONE_PROFILES[toneKey] || TONE_PROFILES.standard;
+
+    try {
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: `✅ لحن نگارش به «${profile.name}» تغییر یافت!`,
+      });
+    } catch {}
+
+    const customInfo = updatedUser.toneCustom ? `\n\n📝 <b>دستور فعلی لحن اختصاصی:</b>\n<i>«${escHtml(updatedUser.toneCustom)}»</i>` : '';
+    await api.sendMessage({
+      chat_id: chatId,
+      text:
+        `✅ <b>لحن نگارش کانال با موفقیت ذخیره شد:</b>\n\n` +
+        `• <b>لحن فعال:</b> ${profile.icon} <b>${profile.name}</b>\n` +
+        `• <b>توضیحات:</b> ${profile.desc}${customInfo}`,
+      parse_mode: 'HTML',
+      reply_markup: toneSelectionKeyboard(updatedUser),
     });
     return;
   }

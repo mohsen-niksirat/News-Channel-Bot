@@ -34,8 +34,10 @@ import {
   channelSettingsKeyboard,
   healthCheckKeyboard,
   adminStatsKeyboard,
+  toneSelectionKeyboard,
   backToMenuKeyboard,
 } from 'lib/keyboards';
+import { TONE_PROFILES } from 'lib/tones';
 
 export default async function (message) {
   if (!message || !message.chat) return;
@@ -164,6 +166,33 @@ export default async function (message) {
         text: `✅ فوتر و امضای کانال ذخیره شد:\n\n<code>${escHtml(text)}</code>`,
         parse_mode: 'HTML',
         reply_markup: channelSettingsKeyboard(updatedUser),
+      });
+      return;
+    }
+
+    // Setting Custom Tone
+    if (user.state === 'awaiting_custom_tone') {
+      const customTone = text.slice(0, 300).trim();
+      if (!customTone) {
+        await api.sendMessage({
+          chat_id: chat.id,
+          text: '⚠️ متن ارسالی نباید خالی باشد. لطفاً دستور سبک دلخواه خود را بنویسید یا /cancel را بزنید:',
+        });
+        return;
+      }
+
+      await updateUser(from.id, { toneProfile: 'custom', toneCustom: customTone });
+      await setUserState(from.id, 'idle');
+      const updatedUser = await getUser(from.id);
+
+      await api.sendMessage({
+        chat_id: chat.id,
+        text:
+          `✅ <b>لحن اختصاصی شما با موفقیت ذخیره و فعال شد!</b>\n\n` +
+          `📝 <b>دستور ذخیره‌شده:</b>\n<i>«${escHtml(customTone)}»</i>\n\n` +
+          `از این پس تمامی اخبار با این سبک شخصی‌سازی بازنویسی خواهند شد.`,
+        parse_mode: 'HTML',
+        reply_markup: toneSelectionKeyboard(updatedUser),
       });
       return;
     }
@@ -402,6 +431,25 @@ export default async function (message) {
         `💡 با دکمه‌های ⬆️ و ⬇️ می‌توانید اولویت مصرف کلیدها را تغییر دهید.`,
       parse_mode: 'HTML',
       reply_markup: aiSettingsKeyboard(user, keysList, cpList),
+    });
+    return;
+  }
+
+  // 5.2. Tone Settings Command
+  if (text === '/tone' || text === '🎨 انتخاب لحن' || text === '🎨 لحن نگارش') {
+    const curTone = user.toneProfile || 'standard';
+    const profile = TONE_PROFILES[curTone] || TONE_PROFILES.standard;
+    const customInfo = user.toneCustom ? `\n\n📝 <b>دستور فعلی لحن اختصاصی:</b>\n<i>«${escHtml(user.toneCustom)}»</i>` : '';
+    await api.sendMessage({
+      chat_id: chat.id,
+      text:
+        `🎨 <b>تنظیم لحن و شخصیت نگارش اخبار (Channel Personality):</b>\n\n` +
+        `هوش مصنوعی اخبار را مطابق لحن انتخابی شما بازنویسی می‌کند.\n\n` +
+        `• <b>لحن فعال فعلی:</b> ${profile.icon} ${profile.name}\n` +
+        `• <b>توضیحات:</b> ${profile.desc}${customInfo}\n\n` +
+        `👇 <i>یکی از لحن‌های زیر را انتخاب کنید:</i>`,
+      parse_mode: 'HTML',
+      reply_markup: toneSelectionKeyboard(user),
     });
     return;
   }

@@ -4,6 +4,7 @@
 
 import { ROUTING_POLICIES } from 'lib/ai_router';
 import { ADMIN_ID } from 'lib/db';
+import { TONE_PROFILES } from 'lib/tones';
 
 export function mainMenuKeyboard(user) {
   const autoPubStatus = user?.autoPublish ? 'روشن 🚀' : 'دستی 📑';
@@ -205,6 +206,12 @@ export function aiSettingsKeyboard(user, keysList, customProvidersList = []) {
     { text: '📊 آمار مصرف توکن‌ها', callback_data: 'm:token_stats' },
   ]);
 
+  const curTone = user.toneProfile || 'standard';
+  const toneName = TONE_PROFILES[curTone]?.name || 'خبری روان';
+  keyboard.push([
+    { text: `🎨 لحن و سبک نگارش: ${toneName}`, callback_data: 'm:tone' },
+  ]);
+
   keyboard.push([
     { text: '🔙 بازگشت به منوی اصلی', callback_data: 'm:menu' },
   ]);
@@ -338,6 +345,29 @@ export function backToMenuKeyboard() {
     ],
   };
 }
+
+export function toneSelectionKeyboard(user) {
+  const current = user?.toneProfile || 'standard';
+  const customNote = user?.toneCustom ? ` («${user.toneCustom.slice(0, 20)}...»)` : '';
+  const rows = [
+    [
+      { text: `${current === 'standard' ? '✅ ' : ''}📰 خبری روان (استاندارد)`, callback_data: 'set:tone:standard' },
+      { text: `${current === 'formal' ? '✅ ' : ''}🏛️ رسمی و تحلیلی`, callback_data: 'set:tone:formal' },
+    ],
+    [
+      { text: `${current === 'energetic' ? '✅ ' : ''}⚡ پرانرژی و جذاب`, callback_data: 'set:tone:energetic' },
+      { text: `${current === 'concise' ? '✅ ' : ''}🎯 فشرده و تیترمحور`, callback_data: 'set:tone:concise' },
+    ],
+    [
+      { text: `${current === 'custom' ? '✅ ' : ''}✏️ لحن اختصاصی${customNote}`, callback_data: 'set:tone:custom' },
+    ],
+    [
+      { text: '🔙 بازگشت به تنظیمات هوش مصنوعی', callback_data: 'm:ai' },
+    ],
+  ];
+  return { inline_keyboard: rows };
+}
+
 
 export function backToAiKeyboard() {
   return {
