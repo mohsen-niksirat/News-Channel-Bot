@@ -202,6 +202,26 @@
           <div id="statRouterPolicy" class="text-sm font-bold text-amber-300 truncate">فالبک اولویتی</div>
           <div class="text-[10px] text-slate-400 mt-1">مدیریت در تب کلیدها</div>
         </div>
+
+        <!-- Metric 5: Pending Drafts -->
+        <div class="glass-card rounded-2xl p-3.5 cursor-pointer hover:bg-white/5 transition-all" onclick="switchAppTab('drafts')">
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span>پیش‌نویس‌ها در صف</span>
+            <span>📑</span>
+          </div>
+          <div id="statDraftsCount" class="text-xl font-black text-amber-300">۰ پیش‌نویس</div>
+          <div class="text-[10px] text-slate-400 mt-1">مشاهده و بررسی در تب پیش‌نویس</div>
+        </div>
+
+        <!-- Metric 6: Published Posts Today -->
+        <div class="glass-card rounded-2xl p-3.5">
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span>منتشرشده امروز</span>
+            <span>🚀</span>
+          </div>
+          <div id="statPublishedCount" class="text-xl font-black text-emerald-400">۰ پست</div>
+          <div class="text-[10px] text-slate-400 mt-1">در کانال متصل تلگرام</div>
+        </div>
       </div>
 
       <!-- Quick Action Buttons -->
@@ -390,7 +410,8 @@
     function resolveUserId() {
       // 1. Direct from Telegram WebApp SDK
       if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-        return window.Telegram.WebApp.initDataUnsafe.user.id;
+        const uid = parseInt(window.Telegram.WebApp.initDataUnsafe.user.id, 10);
+        if (uid > 10000) return uid;
       }
       // 2. From initData query string
       if (window.Telegram?.WebApp?.initData) {
@@ -399,7 +420,7 @@
           const uStr = sp.get('user');
           if (uStr) {
             const u = JSON.parse(uStr);
-            if (u && u.id) return u.id;
+            if (u && u.id && u.id > 10000) return u.id;
           }
         } catch (e) {}
       }
@@ -413,7 +434,7 @@
           const uStr = sp.get('user');
           if (uStr) {
             const u = JSON.parse(uStr);
-            if (u && u.id) return u.id;
+            if (u && u.id && u.id > 10000) return u.id;
           }
         } catch (e) {}
       }
@@ -422,13 +443,17 @@
         const p = new URLSearchParams(window.location.search);
         const uidParam = p.get('uid');
         if (uidParam) {
-          return parseInt(uidParam, 10);
+          const uid = parseInt(uidParam, 10);
+          if (uid > 10000) return uid;
         }
       } catch (e) {}
       // 5. From persisted localStorage
       try {
         const cached = localStorage.getItem('newsstudio_uid');
-        if (cached) return parseInt(cached, 10);
+        if (cached) {
+          const uid = parseInt(cached, 10);
+          if (uid > 10000) return uid;
+        }
       } catch (e) {}
 
       // 6. Creator/Admin fallback so the dashboard never renders blank/zero for Mohsen
@@ -436,6 +461,17 @@
     }
 
     let currentUserId = resolveUserId();
+    let currentToken = '';
+    try {
+      const p = new URLSearchParams(window.location.search);
+      currentToken = p.get('token') || '';
+      if (currentToken) {
+        localStorage.setItem('newsstudio_token', currentToken);
+      } else {
+        currentToken = localStorage.getItem('newsstudio_token') || '';
+      }
+    } catch (e) {}
+
     if (currentUserId) {
       try {
         localStorage.setItem('newsstudio_uid', currentUserId);
@@ -466,7 +502,7 @@
         try {
           const rpcRes = await new Promise((resolve) => {
             const timer = setTimeout(() => resolve(null), 1200);
-            window.Telegram.WebApp.Serverless.call('api', { action, ...payload, userId: currentUserId }, function (err, res) {
+            window.Telegram.WebApp.Serverless.call('api', { action, ...payload, userId: currentUserId, token: currentToken, initData: tg?.initData }, function (err, res) {
               clearTimeout(timer);
               if (err) resolve(null);
               else resolve(res);
@@ -486,11 +522,14 @@
           headers['Authorization'] = 'tma ' + tg.initData;
           headers['X-Telegram-Init-Data'] = tg.initData;
         }
+        if (currentToken) {
+          headers['X-News-Token'] = currentToken;
+        }
 
         let res = await fetch('/api/api', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ action, ...payload, userId: currentUserId }),
+          body: JSON.stringify({ action, ...payload, userId: currentUserId, token: currentToken, initData: tg?.initData }),
         });
 
         // If 401, retry with base64 encoded TMA header
@@ -499,7 +538,7 @@
           res = await fetch('/api/api', {
             method: 'POST',
             headers,
-            body: JSON.stringify({ action, ...payload, userId: currentUserId }),
+            body: JSON.stringify({ action, ...payload, userId: currentUserId, token: currentToken, initData: tg?.initData }),
           });
         }
 
@@ -599,6 +638,19 @@
 
       appState.keys = Array.isArray(data.keys) ? data.keys : [];
       document.getElementById('statKeysCount').innerText = `${appState.keys.length} کلید`;
+      const activeKeys = appState.keys.filter(k => k.status === 'active').length;
+      const deadKeys = appState.keys.filter(k => k.status === 'dead').length;
+      const cdKeys = appState.keys.filter(k => k.status === 'cooldown').length;
+      const healthEl = document.getElementById('statKeysHealth');
+      if (healthEl) {
+        if (deadKeys > 0) {
+          healthEl.innerHTML = `<span class="text-rose-400">●</span> <span>${activeKeys} فعال | <span class="text-rose-400 font-bold">${deadKeys} خطا</span></span>`;
+        } else if (cdKeys > 0) {
+          healthEl.innerHTML = `<span class="text-amber-400">●</span> <span>${activeKeys} فعال | <span class="text-amber-400 font-bold">${cdKeys} استراحت</span></span>`;
+        } else {
+          healthEl.innerHTML = `<span class="text-emerald-400">●</span> <span>${activeKeys} فعال و آماده</span>`;
+        }
+      }
       renderKeys();
 
       appState.sources = Array.isArray(data.sources) ? data.sources : [];
@@ -618,6 +670,16 @@
       }
 
       appState.drafts = Array.isArray(data.drafts) ? data.drafts : [];
+      const draftsEl = document.getElementById('statDraftsCount');
+      if (draftsEl) draftsEl.innerText = `${appState.drafts.length} پیش‌نویس`;
+
+      const pubEl = document.getElementById('statPublishedCount');
+      if (pubEl) {
+        const pubCount = data.overview?.publishedToday !== undefined
+          ? data.overview.publishedToday
+          : (data.user?.postsPublishedCount || 0);
+        pubEl.innerText = `${pubCount.toLocaleString('fa-IR')} پست`;
+      }
       renderDrafts();
 
       if (data.adminStats) {
@@ -1053,18 +1115,21 @@
       container.innerHTML = appState.drafts.map(d => `
         <div class="glass-card rounded-2xl p-4 space-y-2">
           <div class="flex items-center justify-between text-[11px] text-slate-400">
-            <span>منبع: ${d.sourceName || d.source}</span>
+            <span>منبع: ${d.sourceName || d.source || 'نامشخص'}</span>
             <span class="text-emerald-400 font-bold">آماده انتشار</span>
           </div>
           <h4 class="font-bold text-xs text-white leading-snug">${d.aiTitle || d.title}</h4>
           <p class="text-[11px] text-slate-300 font-light leading-relaxed">${d.aiSummary || d.summary}</p>
           <div class="pt-2 flex items-center gap-2 border-t border-white/5">
-            <button onclick="publishDraft(${d.id}, this)" class="flex-1 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-xs transition-all flex items-center justify-center gap-1">
+            <button onclick="publishDraft(${d.id}, this)" class="flex-1 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-xs transition-all flex items-center justify-center gap-1 shadow-md shadow-emerald-500/20">
               <span>✅</span>
               <span>انتشار در کانال</span>
             </button>
-            <button onclick="rejectDraft(${d.id}, this)" class="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-red-400 text-xs font-bold transition-all">
-              ❌ رد
+            <button onclick="editDraft(${d.id})" class="px-2.5 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 active:scale-95 text-indigo-300 text-xs font-bold transition-all">
+              ✏️ ویرایش
+            </button>
+            <button onclick="rejectDraft(${d.id}, this)" class="px-2.5 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 active:scale-95 text-red-400 text-xs font-bold transition-all">
+              🗑️ رد
             </button>
           </div>
         </div>
@@ -1076,16 +1141,18 @@
       const origContent = btn ? btn.innerHTML : '';
       if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<span class="inline-block animate-spin text-sm">⏳</span><span>در حال ارسال به کانال...</span>';
+        btn.innerHTML = '<span class="inline-block animate-spin text-sm">⏳</span><span>در حال انتشار...</span>';
         btn.classList.add('opacity-75', 'cursor-not-allowed');
       }
 
       try {
-        const res = await callServerless('publish_draft', { postId: id });
+        const res = await callServerless('draft/action', { id, actionType: 'publish' });
         if (res && res.ok) {
           haptic('success');
           appState.drafts = appState.drafts.filter(d => d.id !== id);
           renderDrafts();
+          const dEl = document.getElementById('statDraftsCount');
+          if (dEl) dEl.innerText = `${appState.drafts.length} پیش‌نویس`;
           showToast('پست با موفقیت در کانال منتشر شد! 🚀');
         } else {
           haptic('error');
@@ -1119,15 +1186,63 @@
       }
 
       try {
-        const res = await callServerless('reject_draft', { postId: id });
+        const res = await callServerless('draft/action', { id, actionType: 'reject' });
         if (res && res.ok) {
           haptic('light');
           appState.drafts = appState.drafts.filter(d => d.id !== id);
           renderDrafts();
+          const dEl = document.getElementById('statDraftsCount');
+          if (dEl) dEl.innerText = `${appState.drafts.length} پیش‌نویس`;
           showToast('پیش‌نویس رد شد 🗑️');
         } else {
           haptic('error');
           if (btn) {
+            btn.disabled = false;
+            btn.innerText = origText;
+            btn.classList.remove('opacity-75', 'cursor-not-allowed');
+          }
+          showToast(res?.error || 'خطا در رد پیش‌نویس', '❌');
+        }
+      } catch (err) {
+        haptic('error');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = origText;
+          btn.classList.remove('opacity-75', 'cursor-not-allowed');
+        }
+        showToast('خطای شبکه', '❌');
+      }
+    }
+
+    async function editDraft(id) {
+      haptic('light');
+      const draft = appState.drafts.find(d => d.id === id);
+      if (!draft) return;
+      const newTitle = prompt('عنوان جدید پست را وارد کنید:', draft.aiTitle || draft.title || '');
+      if (newTitle === null) return;
+      const newSummary = prompt('خلاصه جدید پست را وارد کنید:', draft.aiSummary || draft.summary || '');
+      if (newSummary === null) return;
+
+      try {
+        const res = await callServerless('draft/action', {
+          id,
+          actionType: 'edit',
+          title: newTitle,
+          summary: newSummary,
+        });
+        if (res && res.ok) {
+          haptic('success');
+          draft.aiTitle = newTitle;
+          draft.aiSummary = newSummary;
+          renderDrafts();
+          showToast('پیش‌نویس با موفقیت ویرایش شد ✏️');
+        } else {
+          showToast(res?.error || 'خطا در ویرایش', '❌');
+        }
+      } catch (err) {
+        showToast('خطای شبکه', '❌');
+      }
+    }
             btn.disabled = false;
             btn.innerText = origText;
             btn.classList.remove('opacity-75', 'cursor-not-allowed');
