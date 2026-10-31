@@ -5,6 +5,7 @@
  */
 
 import { fetch } from 'sdk';
+import { cachedFetchText, globalJinaCache } from 'lib/cache';
 
 /**
  * Pure JS fast 64-bit hash (no WebCrypto / no crypto.subtle dependency)
@@ -109,21 +110,20 @@ export function parseJinaTelegramMarkdown(md, cleanHandle) {
 /**
  * Extracts posts from a public Telegram channel (Jina reader + t.me fallback)
  */
-export async function harvestTelegramChannel(channelHandle, maxPosts = 2) {
+export async function harvestTelegramChannel(channelHandle, maxPosts = 2, customCache = globalJinaCache) {
   const cleanHandle = channelHandle.replace(/^@/, '').replace(/^(?:https?:\/\/)?(?:t\.me|telegram\.me)\/(?:s\/)?/i, '').trim();
 
   // Method 1: Jina Reader Proxy (Bypasses Telegram Serverless egress restrictions on t.me)
   try {
     const jinaUrl = `https://r.jina.ai/https://t.me/s/${cleanHandle}`;
-    const res = await fetch(jinaUrl, {
+    const text = await cachedFetchText(jinaUrl, {
       headers: {
         'Accept': 'text/plain',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) NewsStudio/1.0',
       },
-    });
+    }, fetch, customCache);
 
-    if (res.ok) {
-      const text = await res.text();
+    if (text) {
       const items = parseJinaTelegramMarkdown(text, cleanHandle);
       if (items.length > 0) {
         return items.slice(-maxPosts);
@@ -136,19 +136,17 @@ export async function harvestTelegramChannel(channelHandle, maxPosts = 2) {
   // Method 2: Direct t.me/s web preview (Fallback for non-serverless environments)
   const url = `https://t.me/s/${cleanHandle}`;
   try {
-    const res = await fetch(url, {
+    const html = await cachedFetchText(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml',
       },
-    });
+    }, fetch, customCache);
 
-    if (!res.ok) {
-      console.warn(`harvestTelegramChannel: direct fetch ${url} returned HTTP ${res.status}`);
+    if (!html) {
       return [];
     }
 
-    const html = await res.text();
     const items = [];
 
     const rawWidgets = html.split('<div class="tgme_widget_message_wrap');
