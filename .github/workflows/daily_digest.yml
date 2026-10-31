@@ -1,0 +1,33 @@
+name: Daily Morning Newspaper Digest
+
+on:
+  schedule:
+    # Runs daily at 06:30 UTC (10:00 AM Tehran Time)
+    - cron: '30 6 * * *'
+  workflow_dispatch: # Allows manual one-click trigger from GitHub Actions tab
+
+jobs:
+  daily-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Configure tgcloud credentials & Run Daily Digest
+        env:
+          TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_TOKEN }}
+        run: |
+          mkdir -p .tgcloud
+          if [ -n "$TGCLOUD_TOKEN" ]; then
+            echo "{\"token\":\"$TGCLOUD_TOKEN\"}" > .tgcloud/credentials
+          else
+            echo "Warning: TGCLOUD_TOKEN secret is not set yet. Please add it in GitHub Repository Settings -> Secrets and variables -> Actions."
+          fi
+          npx @tgcloud/cli@^0.2.0 run tgcloud/endpoints/digest_cron "{}"
