@@ -4,13 +4,20 @@
 
 import { ROUTING_POLICIES } from 'lib/ai_router';
 import { ADMIN_ID } from 'lib/db';
+import { hashString } from 'lib/harvester';
 import { TONE_PROFILES } from 'lib/tones';
 import { VALID_CATEGORIES, CATEGORY_LABELS, parseSourceCategories } from 'lib/categories';
 import { parseScheduleWindows, formatScheduleWindowsPersian } from 'lib/schedule';
 
+export function buildMiniAppUrl(tgId) {
+  const uid = tgId || ADMIN_ID;
+  const token = `${uid}:${hashString('newsstudio_auth_' + uid)}`;
+  return `https://app9260009899.tgcloud.ai/?uid=${uid}&token=${token}`;
+}
+
 export function mainMenuKeyboard(user) {
   const autoPubStatus = user?.autoPublish ? 'روشن 🚀' : 'دستی 📑';
-  const miniAppUrl = 'https://app9260009899.tgcloud.ai/?uid=' + (user?.tgId || '');
+  const miniAppUrl = buildMiniAppUrl(user?.tgId);
   const rows = [
     [
       { text: '📱 مینی‌اپ داشبورد پیشرفته (Mini App)', web_app: { url: miniAppUrl } },
@@ -45,8 +52,7 @@ export function mainMenuKeyboard(user) {
 }
 
 export function mainReplyKeyboard(userId = ADMIN_ID) {
-  const effectiveId = userId || ADMIN_ID;
-  const miniAppUrl = 'https://app9260009899.tgcloud.ai/?uid=' + effectiveId;
+  const miniAppUrl = buildMiniAppUrl(userId);
   const rows = [
     [
       { text: '📱 باز کردن مینی‌اپ داشبورد', web_app: { url: miniAppUrl } },

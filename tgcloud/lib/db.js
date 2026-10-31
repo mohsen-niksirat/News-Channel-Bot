@@ -52,8 +52,18 @@ export async function getOrCreateUser(tgUser) {
   return { user: created, isNew: true };
 }
 
-export async function getUser(tgId) {
-  return await db.select().from(users).where(eq(users.tgId, tgId)).get();
+export async function getUser(tgIdOrId) {
+  if (!tgIdOrId) return null;
+  const num = parseInt(tgIdOrId, 10);
+  if (!num) return null;
+  if (num > 10000) {
+    return await db.select().from(users).where(eq(users.tgId, num)).get();
+  }
+  let user = await db.select().from(users).where(eq(users.id, num)).get();
+  if (!user) {
+    user = await db.select().from(users).where(eq(users.tgId, num)).get();
+  }
+  return user || null;
 }
 
 export async function updateUser(tgId, patch) {
@@ -137,10 +147,12 @@ export async function updateUserScheduleWindows(tgId, scheduleWindows) {
 // ---------------- Custom Providers ----------------
 export async function getCustomProviders(userId) {
   if (!userId) return [];
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
   return await db
     .select()
     .from(customProviders)
-    .where(eq(customProviders.userId, userId))
+    .where(or(eq(customProviders.userId, userId), eq(customProviders.userId, targetId)))
     .orderBy(customProviders.id)
     .all();
 }
@@ -220,10 +232,12 @@ export async function addAiKey({ userId = null, provider, apiKey, label, baseUrl
 
 export async function getAiKeys(userId) {
   if (!userId) return [];
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
   return await db
     .select()
     .from(aiKeys)
-    .where(eq(aiKeys.userId, userId))
+    .where(or(eq(aiKeys.userId, userId), eq(aiKeys.userId, targetId)))
     .orderBy(asc(aiKeys.sortOrder), asc(aiKeys.id))
     .all();
 }
@@ -297,6 +311,8 @@ export async function getTokenUsageStats(userId) {
       byProvider: {},
     };
   }
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
   const now = Math.floor(Date.now() / 1000);
   const dayStart = now - (now % 86400); // Today midnight
   const weekAgo = now - 7 * 86400;
@@ -305,7 +321,7 @@ export async function getTokenUsageStats(userId) {
   const all = await db
     .select()
     .from(tokenUsage)
-    .where(eq(tokenUsage.userId, userId))
+    .where(or(eq(tokenUsage.userId, userId), eq(tokenUsage.userId, targetId)))
     .all();
 
   let todayTokens = 0;
@@ -346,10 +362,12 @@ export async function getTokenUsageStats(userId) {
 
 // ---------------- Posts & Queue ----------------
 export async function isPostAlreadyHarvested(userId, originalHash) {
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
   const existing = await db
     .select({ id: posts.id })
     .from(posts)
-    .where(and(eq(posts.userId, userId), eq(posts.originalHash, originalHash)))
+    .where(and(or(eq(posts.userId, userId), eq(posts.userId, targetId)), eq(posts.originalHash, originalHash)))
     .get();
   return Boolean(existing);
 }
@@ -389,10 +407,12 @@ export async function saveDraftPost({
 }
 
 export async function getDraftPosts(userId, limit = 10) {
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
   return await db
     .select()
     .from(posts)
-    .where(and(eq(posts.userId, userId), eq(posts.status, 'draft')))
+    .where(and(or(eq(posts.userId, userId), eq(posts.userId, targetId)), eq(posts.status, 'draft')))
     .orderBy(desc(posts.id))
     .limit(limit)
     .all();

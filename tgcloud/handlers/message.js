@@ -30,6 +30,7 @@ import { buildEditorialPost, buildPostButtons, sendRichPostSafe, escHtml } from 
 import {
   mainMenuKeyboard,
   mainReplyKeyboard,
+  buildMiniAppUrl,
   reviewPostKeyboard,
   sourcesManagementKeyboard,
   aiSettingsKeyboard,
@@ -58,7 +59,7 @@ export default async function (message) {
     menu_button: {
       type: 'web_app',
       text: 'استودیو خبر 📰',
-      web_app: { url: `https://app9260009899.tgcloud.ai/?uid=${from.id}` },
+      web_app: { url: buildMiniAppUrl(from.id) },
     },
   }).catch(() => {});
 
@@ -400,7 +401,7 @@ export default async function (message) {
         menu_button: {
           type: 'web_app',
           text: 'داشبورد خبر',
-          web_app: { url: `https://app9260009899.tgcloud.ai/?uid=${from.id}` },
+          web_app: { url: buildMiniAppUrl(from.id) },
         },
       });
     } catch (e) {}
