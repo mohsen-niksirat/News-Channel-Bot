@@ -2,8 +2,8 @@ name: Hourly News Scan & Publish
 
 on:
   schedule:
-    # Runs automatically at the start of every hour (24 times a day, UTC)
-    - cron: '0 * * * *'
+    # Runs twice an hour at minutes 15 and 45 (avoids congested minute 0 on GitHub)
+    - cron: '15,45 * * * *'
   workflow_dispatch: # Allows manual one-click trigger from GitHub Actions tab
 
 jobs:
