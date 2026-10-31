@@ -23,6 +23,7 @@ import { harvestTelegramChannel, harvestRssFeed } from 'lib/harvester';
 import { generateNewsRewrite } from 'lib/ai_router';
 import { buildEditorialPost, buildBulletinPost, buildPostButtons, sendRichPostSafe, preparePostForPublishing, escHtml } from 'lib/rich_post';
 import { mainMenuKeyboard, reviewPostKeyboard } from 'lib/keyboards';
+import { getToneSystemPrompt, parseAiNewsJson } from 'lib/tones';
 
 export async function runScanForUser(userId, chatId = null) {
   const user = await getUser(userId);
@@ -115,6 +116,8 @@ export async function runScanForUser(userId, chatId = null) {
   // ---------------- CASE A: Individual Rich Posts ----------------
   if (!shouldAggregate) {
     let publishedCount = 0;
+    const toneAppendix = getToneSystemPrompt(user);
+    const baseSystemPrompt = 'تو یک روزنامه‌نگار و نویسنده خلاق اخبار هستی. متن را روان، شیوا، فارسی و جذاب بنویس.' + toneAppendix;
 
     for (const item of candidateItems) {
       const prompt = `شما سردبیر حرفه‌ای کانال تلگرام هستید. خبر زیر را به یک پست جذاب ژورنالی تلگرام تبدیل کن:
@@ -122,14 +125,18 @@ export async function runScanForUser(userId, chatId = null) {
 عنوان: ${item.title}
 متن: ${item.content}
 
-فرمت خروجی دقیقاً به این شکل باشد:
-[TITLE]: یک تیتر کوتاه، جذاب و ترغیب‌کننده
-[SUMMARY]: خلاصه ۲ تا ۳ خطی لید خبر
-[DETAILS]: ۲ تا ۳ نکته کلیدی تکمیلی خبر`;
+پاسخ را الزاماً در قالب این شیء JSON معتبر بازگردان:
+{
+  "title": "یک تیتر کوتاه، جذاب و ترغیب‌کننده فارسی",
+  "summary": "خلاصه ۲ تا ۳ خطی لید خبر",
+  "details": ["۲ تا ۳ نکته کلیدی تکمیلی خبر"],
+  "importance": 4
+}
+(importance یک عدد صحیح بین ۱ تا ۵ است که درجه اهمیت خبر را نشان می‌دهد)`;
 
       try {
         const aiRes = await generateNewsRewrite({
-          systemPrompt: 'تو یک روزنامه‌نگار و نویسنده خلاق اخبار هستی. متن را روان، شیوا، فارسی و جذاب بنویس.',
+          systemPrompt: baseSystemPrompt,
           userPrompt: prompt,
           preferredProvider: user.preferredAiProvider || 'gemini',
           preferredModel: user.preferredModel || 'gemini-3.1-flash-lite',
@@ -138,37 +145,27 @@ export async function runScanForUser(userId, chatId = null) {
           maxTokens: 1200,
         });
 
-        let fullText = aiRes.text;
-        let tMatch = fullText.match(/\[TITLE\]:?\s*([^\n]+)/i);
-        let sMatch = fullText.match(/\[SUMMARY\]:?\s*([\s\S]*?)(?=\[DETAILS\]|$)/i);
-        let dMatch = fullText.match(/\[DETAILS\]:?\s*([\s\S]*?)$/i);
+        let parsed = parseAiNewsJson(aiRes.text);
 
-        // One-time retry on format drift if [TITLE] was missing
-        if (!tMatch) {
+        // One-time retry on format drift if parse failed
+        if (!parsed.success) {
           try {
             const retryRes = await generateNewsRewrite({
-              systemPrompt: 'تو یک روزنامه‌نگار و نویسنده خلاق اخبار هستی. متن را روان، شیوا، فارسی و جذاب بنویس.',
-              userPrompt: prompt + '\n\nمهم: فقط خروجی را دقیقاً در قالب [TITLE]/[SUMMARY]/[DETAILS] بده، بدون هیچ متن اضافه.',
+              systemPrompt: baseSystemPrompt,
+              userPrompt: prompt + '\n\nمهم: فقط یک شیء JSON معتبر بده، بدون هیچ متن اضافه. در صورت عدم توانایی، دقیقاً از فرمت [TITLE]: ... و [SUMMARY]: ... استفاده کن.',
               preferredProvider: user.preferredAiProvider || 'gemini',
               preferredModel: user.preferredModel || 'gemini-3.1-flash-lite',
               userId: userId,
               routingPolicy: user.routingPolicy || 'fallback',
               maxTokens: 1200,
             });
-            const rText = retryRes.text;
-            const rtMatch = rText.match(/\[TITLE\]:?\s*([^\n]+)/i);
-            if (rtMatch) {
-              fullText = rText;
-              tMatch = rtMatch;
-              sMatch = rText.match(/\[SUMMARY\]:?\s*([\s\S]*?)(?=\[DETAILS\]|$)/i);
-              dMatch = rText.match(/\[DETAILS\]:?\s*([\s\S]*?)$/i);
-            }
+            parsed = parseAiNewsJson(retryRes.text);
           } catch {}
         }
 
-        const aiTitle = tMatch ? tMatch[1].trim() : item.title;
-        const aiSummary = sMatch ? sMatch[1].trim() : fullText.slice(0, 180);
-        const aiDetails = dMatch ? dMatch[1].trim() : '';
+        const aiTitle = parsed.title || item.title;
+        const aiSummary = parsed.summary || item.title;
+        const importance = parsed.importance;
 
         const formattedHtml = preparePostForPublishing({
           post: {
@@ -191,6 +188,7 @@ export async function runScanForUser(userId, chatId = null) {
           formattedHtml,
           imageUrl: item.imageUrl,
           category: item.category,
+          importance,
         });
 
         publishedCount++;
@@ -236,6 +234,8 @@ export async function runScanForUser(userId, chatId = null) {
   // ---------------- CASE B: 3+ News Items -> Aggregate into Hourly Bulletin (تجمیع در یک پست) ----------------
   const processedItems = [];
   const savedPostIds = [];
+  const toneAppendix = getToneSystemPrompt(user);
+  const bulletinSystemPrompt = 'تو سردبیر خبر هستی. کوتاه، پرانرژی و روان بنویس.' + toneAppendix;
 
   for (const item of candidateItems.slice(0, 4)) {
     const prompt = `این خبر را در ۱ تیتر جذاب فارسی و حداکثر ۲ خط چکیده روان بازنویسی کن:
@@ -243,13 +243,16 @@ export async function runScanForUser(userId, chatId = null) {
 عنوان: ${item.title}
 متن: ${item.content}
 
-فرمت خروجی:
-[TITLE]: تیتر جذاب
-[SUMMARY]: خلاصه ۲ خطی`;
+پاسخ را الزاماً در این قالب JSON معتبر بده:
+{
+  "title": "تیتر جذاب",
+  "summary": "خلاصه ۲ خطی",
+  "importance": 3
+}`;
 
     try {
       const aiRes = await generateNewsRewrite({
-        systemPrompt: 'تو سردبیر خبر هستی. کوتاه، پرانرژی و روان بنویس.',
+        systemPrompt: bulletinSystemPrompt,
         userPrompt: prompt,
         preferredProvider: user.preferredAiProvider || 'gemini',
         preferredModel: user.preferredModel || 'gemini-3.1-flash-lite',
@@ -257,12 +260,24 @@ export async function runScanForUser(userId, chatId = null) {
         routingPolicy: user.routingPolicy || 'fallback',
       });
 
-      const fullText = aiRes.text;
-      const tMatch = fullText.match(/\[TITLE\]:?\s*([^\n]+)/i);
-      const sMatch = fullText.match(/\[SUMMARY\]:?\s*([\s\S]*?)$/i);
+      let parsed = parseAiNewsJson(aiRes.text);
+      if (!parsed.success) {
+        try {
+          const retryRes = await generateNewsRewrite({
+            systemPrompt: bulletinSystemPrompt,
+            userPrompt: prompt + '\n\nمهم: فقط خروجی معتبر JSON ارسال کن.',
+            preferredProvider: user.preferredAiProvider || 'gemini',
+            preferredModel: user.preferredModel || 'gemini-3.1-flash-lite',
+            userId: userId,
+            routingPolicy: user.routingPolicy || 'fallback',
+          });
+          parsed = parseAiNewsJson(retryRes.text);
+        } catch {}
+      }
 
-      const aiTitle = tMatch ? tMatch[1].trim() : item.title;
-      const aiSummary = sMatch ? sMatch[1].trim() : fullText.slice(0, 150);
+      const aiTitle = parsed.title || item.title;
+      const aiSummary = parsed.summary || item.title;
+      const importance = parsed.importance;
 
       processedItems.push({
         aiTitle,
@@ -292,6 +307,7 @@ export async function runScanForUser(userId, chatId = null) {
         formattedHtml: itemPostHtml,
         imageUrl: item.imageUrl,
         category: item.category,
+        importance,
       });
 
       savedPostIds.push(saved.id);

@@ -131,7 +131,7 @@ test('runScanForUser: retries when format drift occurs without [TITLE]', async (
       status: 200,
       async json() {
         return {
-          choices: [{ message: { content: '[TITLE]: تیتر تصحیح شده پس از ریترای\n[SUMMARY]: خلاصه متن خبر\n[DETAILS]: جزئیات' } }],
+          choices: [{ message: { content: '```json\n{\n  "title": "تیتر تصحیح شده پس از ریترای JSON",\n  "summary": "خلاصه متن خبر",\n  "details": ["نکته یک"],\n  "importance": 4\n}\n```' } }],
           usage: { prompt_tokens: 60, completion_tokens: 30, total_tokens: 90 },
         };
       },
@@ -143,8 +143,9 @@ test('runScanForUser: retries when format drift occurs without [TITLE]', async (
 
   assert.equal(aiCalls >= 2, true, 'AI rewrite must have been called twice due to format drift retry');
 
-  // Verify post was saved with corrected title from the retry
+  // Verify post was saved with corrected title and importance from the retry
   const saved = await db.select().from(posts).where((r) => r.userId === 500).get();
   assert.equal(Boolean(saved), true);
-  assert.equal(saved.aiTitle, 'تیتر تصحیح شده پس از ریترای');
+  assert.equal(saved.aiTitle, 'تیتر تصحیح شده پس از ریترای JSON');
+  assert.equal(saved.importance, 4);
 });
