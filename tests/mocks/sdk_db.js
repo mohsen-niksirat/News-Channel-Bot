@@ -75,3 +75,13 @@ export function desc(col) {
   const key = col?._key || col?._colName || col;
   return { key, dir: 'desc' };
 }
+
+export function gte(col, val) {
+  const key = col?._key || col?._colName || col;
+  return (row) => (row[key] || 0) >= val;
+}
+
+export function lte(col, val) {
+  const key = col?._key || col?._colName || col;
+  return (row) => (row[key] || 0) <= val;
+}

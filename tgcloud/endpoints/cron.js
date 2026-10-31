@@ -2,9 +2,27 @@ import { db } from 'sdk';
 import { users } from 'schema';
 import { runScanForUser } from 'lib/scanner';
 import { isInsideScheduleWindow } from 'lib/schedule';
+import { shouldPublishDailyDigestNow, sendDailyDigestForUser } from 'lib/digest';
 
 export default async function (input, ctx) {
   console.log('cron: started with input', JSON.stringify(input));
+  if (input?.mode === 'digest') {
+    const targetUserId = input?.userId ? parseInt(input.userId, 10) : null;
+    const allUsers = await db.select().from(users).all();
+    const candidateUsers = allUsers.filter((u) => !targetUserId || u.tgId === targetUserId);
+    const results = [];
+    for (const u of candidateUsers) {
+      if (!u.channelId) continue;
+      if (!shouldPublishDailyDigestNow(u)) continue;
+      try {
+        const res = await sendDailyDigestForUser(u.tgId, null, true);
+        results.push({ tgId: u.tgId, ...res });
+      } catch (err) {
+        results.push({ tgId: u.tgId, error: err.message });
+      }
+    }
+    return { ok: true, results };
+  }
   try {
     const targetUserId = input?.userId ? parseInt(input.userId, 10) : null;
     const allUsers = await db.select().from(users).all();

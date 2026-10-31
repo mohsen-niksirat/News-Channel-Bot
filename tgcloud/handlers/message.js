@@ -25,6 +25,7 @@ import {
 import { runScanForUser } from 'lib/scanner';
 import { generateNewsRewrite, ROUTING_POLICIES } from 'lib/ai_router';
 import { runHealthCheckForUser } from 'lib/health_check';
+import { sendDailyDigestForUser } from 'lib/digest';
 import { buildEditorialPost, buildPostButtons, sendRichPostSafe, escHtml } from 'lib/rich_post';
 import {
   mainMenuKeyboard,
@@ -445,6 +446,23 @@ export default async function (message) {
       imageUrl: post.imageUrl,
       buttons: reviewPostKeyboard(post.id, post.sourceUrl, 0, total),
     });
+    return;
+  }
+
+  // 4.5. Daily Newspaper / Digest Command (/newspaper)
+  if (
+    text === '/newspaper' ||
+    text === '/digest' ||
+    text === '🗞️ روزنامه امروز' ||
+    text === '🗞️ روزنامه صبحگاهی' ||
+    text === 'روزنامه امروز'
+  ) {
+    await api.sendMessage({
+      chat_id: chat.id,
+      text: '🗞️ <b>در حال گردآوری و صفحه‌بندی روزنامه اختصاصی امروز...</b>\nلطفاً چند لحظه شکیبا باشید.',
+      parse_mode: 'HTML',
+    });
+    await sendDailyDigestForUser(from.id, chat.id);
     return;
   }
 

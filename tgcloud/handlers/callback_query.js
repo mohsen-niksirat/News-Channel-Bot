@@ -27,6 +27,7 @@ import {
 import { runScanForUser } from 'lib/scanner';
 import { generateNewsRewrite, ROUTING_POLICIES } from 'lib/ai_router';
 import { runHealthCheckForUser } from 'lib/health_check';
+import { sendDailyDigestForUser } from 'lib/digest';
 import { buildEditorialPost, buildPostButtons, sendRichPostSafe, preparePostForPublishing, escHtml } from 'lib/rich_post';
 import {
   mainMenuKeyboard,
@@ -938,45 +939,12 @@ export default async function (query) {
   if (data === 'act:digest') {
     await api.sendMessage({
       chat_id: chatId,
-      text: '🗞️ <b>در حال گردآوری و تجمیع روزنامه اختصاصی امروز با هوش مصنوعی...</b>\nلطفاً چند لحظه شکیبا باشید.',
+      text: '🗞️ <b>در حال گردآوری و صفحه‌بندی روزنامه اختصاصی امروز...</b>\nلطفاً چند لحظه شکیبا باشید.',
       parse_mode: 'HTML',
     });
 
     try {
-      const drafts = await getDraftPosts(from.id, 6);
-      if (!drafts || drafts.length === 0) {
-        await api.sendMessage({
-          chat_id: chatId,
-          text: '📌 خبر کافی برای چاپ روزنامه موجود نیست. ابتدا دکمه «🔍 اسکن فوری منابع» را بزنید.',
-          reply_markup: mainMenuKeyboard(user),
-        });
-        return;
-      }
-
-      const combinedText = drafts.map((d, i) => `${i + 1}. [${d.sourceName}] ${d.aiTitle}: ${d.aiSummary}`).join('\n\n');
-
-      const aiRes = await generateNewsRewrite({
-        systemPrompt: 'تو سردبیر یک مجله خبری معتبر هستی. اخبار امروز را در قالب یک "روزنامه صبحگاهی ۳ دقیقه‌ای" جذاب و خوش‌خوان با ایموجی‌های مناسب دسته‌بندی و ادغام کن.',
-        userPrompt: combinedText,
-        preferredProvider: user.preferredAiProvider,
-        preferredModel: user.preferredModel,
-        userId: from.id,
-        routingPolicy: user.routingPolicy || 'fallback',
-      });
-
-      const digestHtml =
-        `🗞️ <b>روزنامه و خلاصه اخبار اختصاصی امروز</b>\n` +
-        `📅 <i>${new Date().toLocaleDateString('fa-IR')}</i>\n` +
-        `──────────────\n\n` +
-        aiRes.text +
-        `\n\n──────────────\n` +
-        `${escHtml(user.footerText || '📢 @MyLeitner')}`;
-
-      await sendRichPostSafe({
-        chatId: chatId,
-        postHtml: digestHtml,
-        buttons: backToMenuKeyboard(),
-      });
+      await sendDailyDigestForUser(from.id, chatId);
     } catch (err) {
       await api.sendMessage({
         chat_id: chatId,
