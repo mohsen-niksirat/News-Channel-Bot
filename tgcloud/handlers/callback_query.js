@@ -5,6 +5,9 @@ import {
   updateUser,
   setUserState,
   getUserSources,
+  getSourceById,
+  updateSourceCategories,
+  updateUserScheduleWindows,
   toggleSource,
   deleteSource,
   getAiKeys,
@@ -30,6 +33,8 @@ import {
   mainReplyKeyboard,
   reviewPostKeyboard,
   sourcesManagementKeyboard,
+  sourceCategoriesKeyboard,
+  scheduleSettingsKeyboard,
   aiSettingsKeyboard,
   providerSelectionKeyboard,
   routingPolicyKeyboard,
@@ -42,6 +47,8 @@ import {
   backToMenuKeyboard,
 } from 'lib/keyboards';
 import { TONE_PROFILES } from 'lib/tones';
+import { VALID_CATEGORIES, CATEGORY_LABELS, toggleCategoryInList } from 'lib/categories';
+import { parseScheduleWindows, isValidTimeFormat, formatScheduleWindowsPersian } from 'lib/schedule';
 
 export default async function (query) {
   if (!query || !query.data) return;
@@ -391,6 +398,47 @@ export default async function (query) {
         reply_markup: sourcesManagementKeyboard(list),
       });
     } catch {}
+    return;
+  }
+
+  // 4.3 Source Category Filtering
+  if (data.startsWith('cats:src:')) {
+    const srcId = parseInt(data.replace('cats:src:', ''), 10);
+    const src = await getSourceById(srcId);
+    if (!src) {
+      await api.sendMessage({ chat_id: chatId, text: 'منبع مورد نظر یافت نشد.' });
+      return;
+    }
+    await api.sendMessage({
+      chat_id: chatId,
+      text: `🏷️ <b>دسته‌بندی‌های منبع «${escHtml(src.name)}»:</b>\n\nاخبار استخراج‌شده با هوش مصنوعی دسته‌بندی می‌شوند. دسته‌هایی که تیک سبز دارند در کانال و پیش‌نویس‌ها قرار می‌گیرند:`,
+      parse_mode: 'HTML',
+      reply_markup: sourceCategoriesKeyboard(src),
+    });
+    return;
+  }
+
+  if (data.startsWith('tog:scat:')) {
+    const parts = data.split(':');
+    const srcId = parseInt(parts[2], 10);
+    const cat = parts[3];
+    const src = await getSourceById(srcId);
+    if (src) {
+      const updatedList = toggleCategoryInList(src.categories, cat);
+      await updateSourceCategories(srcId, updatedList);
+      src.categories = JSON.stringify(updatedList);
+      try {
+        await api.editMessageReplyMarkup({
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: sourceCategoriesKeyboard(src),
+        });
+        await api.answerCallbackQuery({
+          callback_query_id: query.id,
+          text: `دسته‌بندی ${CATEGORY_LABELS[cat] || cat} به‌روزرسانی شد.`,
+        });
+      } catch {}
+    }
     return;
   }
 
@@ -791,6 +839,95 @@ export default async function (query) {
       text:
         '✏️ <b>تنظیم فوتر و امضای کانال:</b>\n\n' +
         'متن یا آیدی دلخواه خود را بفرستید (این متن در انتهای تمام پست‌های منتشرشده قرار می‌گیرد، مثلاً: <code>📢 کانال رسمی: @MyLeitner</code>):',
+      parse_mode: 'HTML',
+      reply_markup: backToMenuKeyboard(),
+    });
+    return;
+  }
+
+  // 7.5 Schedule Windows Settings (Tehran Time)
+  if (data === 'm:schedule') {
+    const windowsText = formatScheduleWindowsPersian(user.scheduleWindows);
+    await api.sendMessage({
+      chat_id: chatId,
+      text:
+        `⏱️ <b>تنظیم ساعات انتشار خودکار (بر اساس افق تهران):</b>\n\n` +
+        `وضعیت فعلی: <b>${escHtml(windowsText)}</b>\n\n` +
+        `💡 <i>نکته: در صورت فعال بودن زمان‌بندی، اسکن و ذخیره پیش‌نویس‌ها در هر دور انجام می‌شود، اما ارسال به کانال تنها در بازه ۱۰± دقیقه از این ساعات رخ خواهد داد.</i>`,
+      parse_mode: 'HTML',
+      reply_markup: scheduleSettingsKeyboard(user),
+    });
+    return;
+  }
+
+  if (data.startsWith('add:sched:')) {
+    const time = data.replace('add:sched:', '').trim();
+    if (isValidTimeFormat(time)) {
+      const current = parseScheduleWindows(user.scheduleWindows) || [];
+      if (!current.includes(time)) {
+        current.push(time);
+        await updateUserScheduleWindows(from.id, current);
+        user.scheduleWindows = JSON.stringify(current);
+      }
+      try {
+        await api.editMessageReplyMarkup({
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: scheduleSettingsKeyboard(user),
+        });
+        await api.answerCallbackQuery({
+          callback_query_id: query.id,
+          text: `ساعت ${time} به برنامه انتشار اضافه شد.`,
+        });
+      } catch {}
+    }
+    return;
+  }
+
+  if (data.startsWith('del:sched:')) {
+    const time = data.replace('del:sched:', '').trim();
+    const current = parseScheduleWindows(user.scheduleWindows) || [];
+    const updated = current.filter((t) => t !== time);
+    await updateUserScheduleWindows(from.id, updated.length > 0 ? updated : null);
+    user.scheduleWindows = updated.length > 0 ? JSON.stringify(updated) : null;
+    try {
+      await api.editMessageReplyMarkup({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: scheduleSettingsKeyboard(user),
+      });
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: `ساعت ${time} حذف شد.`,
+      });
+    } catch {}
+    return;
+  }
+
+  if (data === 'act:clear_schedule') {
+    await updateUserScheduleWindows(from.id, null);
+    user.scheduleWindows = null;
+    try {
+      await api.editMessageReplyMarkup({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: scheduleSettingsKeyboard(user),
+      });
+      await api.answerCallbackQuery({
+        callback_query_id: query.id,
+        text: 'تمام ساعات پاک شدند. انتشار بدون محدودیت زمانی فعال است.',
+      });
+    } catch {}
+    return;
+  }
+
+  if (data === 'act:add_schedule_custom') {
+    await setUserState(from.id, 'awaiting_schedule_time');
+    await api.sendMessage({
+      chat_id: chatId,
+      text:
+        '⏱️ <b>افزودن ساعت دلخواه:</b>\n\n' +
+        'لطفاً ساعت مورد نظر را به صورت ۲۴ ساعته ارسال کنید (مثلاً <code>08:30</code> یا <code>19:45</code>):',
       parse_mode: 'HTML',
       reply_markup: backToMenuKeyboard(),
     });

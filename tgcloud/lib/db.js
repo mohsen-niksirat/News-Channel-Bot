@@ -4,11 +4,15 @@ import { users, sources, customProviders, aiKeys, tokenUsage, posts } from 'sche
 
 export const ADMIN_ID = 65807806; // Mohsen Niksirat
 
+export const DEFAULT_SOURCE_CATEGORIES = JSON.stringify([
+  'tech', 'economy', 'sport', 'world', 'social', 'culture', 'science', 'other'
+]);
+
 export const DEFAULT_GLOBAL_SOURCES = [
-  { name: 'Zoomit', type: 'rss', urlOrHandle: 'https://zoomit.ir/feed/', lang: 'fa', category: 'tech' },
-  { name: 'TechCrunch', type: 'rss', urlOrHandle: 'https://techcrunch.com/feed/', lang: 'en', category: 'tech' },
-  { name: 'The Verge', type: 'rss', urlOrHandle: 'https://www.theverge.com/rss/index.xml', lang: 'en', category: 'tech' },
-  { name: 'GadgetNews', type: 'rss', urlOrHandle: 'https://gadgetnews.net/feed/', lang: 'fa', category: 'tech' },
+  { name: 'Zoomit', type: 'rss', urlOrHandle: 'https://zoomit.ir/feed/', lang: 'fa', category: 'tech', categories: DEFAULT_SOURCE_CATEGORIES },
+  { name: 'TechCrunch', type: 'rss', urlOrHandle: 'https://techcrunch.com/feed/', lang: 'en', category: 'tech', categories: DEFAULT_SOURCE_CATEGORIES },
+  { name: 'The Verge', type: 'rss', urlOrHandle: 'https://www.theverge.com/rss/index.xml', lang: 'en', category: 'tech', categories: DEFAULT_SOURCE_CATEGORIES },
+  { name: 'GadgetNews', type: 'rss', urlOrHandle: 'https://gadgetnews.net/feed/', lang: 'fa', category: 'tech', categories: DEFAULT_SOURCE_CATEGORIES },
 ];
 
 export async function getOrCreateUser(tgUser) {
@@ -40,6 +44,7 @@ export async function getOrCreateUser(tgUser) {
       urlOrHandle: s.urlOrHandle,
       lang: s.lang,
       category: s.category,
+      categories: s.categories || DEFAULT_SOURCE_CATEGORIES,
       enabled: true,
     }).run();
   }
@@ -109,6 +114,24 @@ export async function deleteSource(sourceId, userId) {
   const u = await getUser(userId);
   const targetId = u ? u.id : userId;
   await db.delete(sources).where(and(eq(sources.id, sourceId), or(eq(sources.userId, userId), eq(sources.userId, targetId)))).run();
+}
+
+export async function getSourceById(sourceId) {
+  return await db.select().from(sources).where(eq(sources.id, sourceId)).get();
+}
+
+export async function updateSourceCategories(sourceId, categories) {
+  const jsonStr = typeof categories === 'string' ? categories : JSON.stringify(categories);
+  await db.update(sources).set({ categories: jsonStr }).where(eq(sources.id, sourceId)).run();
+  return getSourceById(sourceId);
+}
+
+export async function updateUserScheduleWindows(tgId, scheduleWindows) {
+  const jsonStr = Array.isArray(scheduleWindows)
+    ? (scheduleWindows.length > 0 ? JSON.stringify(scheduleWindows) : null)
+    : (scheduleWindows || null);
+  await db.update(users).set({ scheduleWindows: jsonStr }).where(eq(users.tgId, tgId)).run();
+  return getUser(tgId);
 }
 
 // ---------------- Custom Providers ----------------

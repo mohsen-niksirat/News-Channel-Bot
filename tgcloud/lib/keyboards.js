@@ -5,6 +5,8 @@
 import { ROUTING_POLICIES } from 'lib/ai_router';
 import { ADMIN_ID } from 'lib/db';
 import { TONE_PROFILES } from 'lib/tones';
+import { VALID_CATEGORIES, CATEGORY_LABELS, parseSourceCategories } from 'lib/categories';
+import { parseScheduleWindows, formatScheduleWindowsPersian } from 'lib/schedule';
 
 export function mainMenuKeyboard(user) {
   const autoPubStatus = user?.autoPublish ? 'روشن 🚀' : 'دستی 📑';
@@ -137,6 +139,7 @@ export function sourcesManagementKeyboard(sourcesList) {
     const typeIcon = s.type === 'telegram' ? '📢' : '🌐';
     keyboard.push([
       { text: `${statusIcon} ${typeIcon} ${s.name}`, callback_data: `tog:src:${s.id}` },
+      { text: '🏷️ دسته‌ها', callback_data: `cats:src:${s.id}` },
       { text: '🗑️', callback_data: `del:src:${s.id}` },
     ]);
   }
@@ -146,6 +149,38 @@ export function sourcesManagementKeyboard(sourcesList) {
   ]);
   keyboard.push([
     { text: '🔙 بازگشت به منوی اصلی', callback_data: 'm:menu' },
+  ]);
+
+  return { inline_keyboard: keyboard };
+}
+
+export function sourceCategoriesKeyboard(source) {
+  const keyboard = [];
+  const activeCats = parseSourceCategories(source?.categories);
+
+  // 2 buttons per row for compact Persian UI
+  for (let i = 0; i < VALID_CATEGORIES.length; i += 2) {
+    const row = [];
+    const cat1 = VALID_CATEGORIES[i];
+    const on1 = activeCats.includes(cat1);
+    row.push({
+      text: `${on1 ? '✅' : '❌'} ${CATEGORY_LABELS[cat1] || cat1}`,
+      callback_data: `tog:scat:${source.id}:${cat1}`,
+    });
+
+    if (i + 1 < VALID_CATEGORIES.length) {
+      const cat2 = VALID_CATEGORIES[i + 1];
+      const on2 = activeCats.includes(cat2);
+      row.push({
+        text: `${on2 ? '✅' : '❌'} ${CATEGORY_LABELS[cat2] || cat2}`,
+        callback_data: `tog:scat:${source.id}:${cat2}`,
+      });
+    }
+    keyboard.push(row);
+  }
+
+  keyboard.push([
+    { text: '🔙 بازگشت به مدیریت منابع', callback_data: 'm:sources' },
   ]);
 
   return { inline_keyboard: keyboard };
@@ -298,6 +333,9 @@ export function channelSettingsKeyboard(user) {
     smart: '⚡ حالت هوشمند',
   };
   const modeText = modeLabels[user.publishMode || 'smart'] || '⚡ حالت هوشمند';
+  const windows = parseScheduleWindows(user?.scheduleWindows);
+  const schedCount = windows ? `${windows.length} زمان فعال` : 'همیشه';
+
   return {
     inline_keyboard: [
       [
@@ -305,6 +343,9 @@ export function channelSettingsKeyboard(user) {
       ],
       [
         { text: `🚀 انتشار خودکار: ${autoIcon}`, callback_data: 'tog:autopub' },
+      ],
+      [
+        { text: `⏱️ ساعات انتشار: ${schedCount}`, callback_data: 'm:schedule' },
       ],
       [
         { text: `📰 حالت انتشار: ${modeText}`, callback_data: 'm:publish_mode' },
@@ -317,6 +358,44 @@ export function channelSettingsKeyboard(user) {
       ],
     ],
   };
+}
+
+export function scheduleSettingsKeyboard(user) {
+  const keyboard = [];
+  const windows = parseScheduleWindows(user?.scheduleWindows);
+
+  if (windows && windows.length > 0) {
+    for (const w of windows) {
+      keyboard.push([
+        { text: `⏰ ساعت ${w} (به وقت تهران)`, callback_data: 'act:noop' },
+        { text: '🗑️ حذف', callback_data: `del:sched:${w}` },
+      ]);
+    }
+  }
+
+  // Quick preset buttons to add common schedule times
+  keyboard.push([
+    { text: '➕ ۰۹:۰۰', callback_data: 'add:sched:09:00' },
+    { text: '➕ ۱۳:۰۰', callback_data: 'add:sched:13:00' },
+    { text: '➕ ۱۸:۰۰', callback_data: 'add:sched:18:00' },
+    { text: '➕ ۲۱:۰۰', callback_data: 'add:sched:21:00' },
+  ]);
+
+  keyboard.push([
+    { text: '✏️ افزودن ساعت دلخواه (مثلاً 10:30)', callback_data: 'act:add_schedule_custom' },
+  ]);
+
+  if (windows && windows.length > 0) {
+    keyboard.push([
+      { text: '🔄 پاک کردن همه ساعات (انتشار در هر اسکن)', callback_data: 'act:clear_schedule' },
+    ]);
+  }
+
+  keyboard.push([
+    { text: '🔙 بازگشت به تنظیمات کانال', callback_data: 'm:channel' },
+  ]);
+
+  return { inline_keyboard: keyboard };
 }
 
 export function publishModeKeyboard(currentMode = 'smart') {

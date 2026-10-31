@@ -24,11 +24,13 @@ import { generateNewsRewrite } from 'lib/ai_router';
 import { buildEditorialPost, buildBulletinPost, buildPostButtons, sendRichPostSafe, preparePostForPublishing, escHtml } from 'lib/rich_post';
 import { mainMenuKeyboard, reviewPostKeyboard } from 'lib/keyboards';
 import { getToneSystemPrompt, parseAiNewsJson } from 'lib/tones';
+import { parseSourceCategories } from 'lib/categories';
 
-export async function runScanForUser(userId, chatId = null) {
+export async function runScanForUser(userId, chatId = null, options = {}) {
   const user = await getUser(userId);
   if (!user) return;
 
+  const draftOnly = Boolean(options?.draftOnly);
   const notifyChat = chatId || userId;
 
   // Check if user has added at least one AI key
@@ -93,7 +95,11 @@ export async function runScanForUser(userId, chatId = null) {
       if (candidateItems.length >= 5) break;
       const exists = await isPostAlreadyHarvested(userId, item.hash);
       if (!exists && !candidateItems.some((c) => c.hash === item.hash)) {
-        candidateItems.push({ ...item, category: src.category });
+        candidateItems.push({
+          ...item,
+          category: src.category,
+          sourceCategories: src.categories,
+        });
       }
     }
   }
@@ -130,9 +136,10 @@ export async function runScanForUser(userId, chatId = null) {
   "title": "یک تیتر کوتاه، جذاب و ترغیب‌کننده فارسی",
   "summary": "خلاصه ۲ تا ۳ خطی لید خبر",
   "details": ["۲ تا ۳ نکته کلیدی تکمیلی خبر"],
-  "importance": 4
+  "importance": 4,
+  "category": "tech"
 }
-(importance یک عدد صحیح بین ۱ تا ۵ است که درجه اهمیت خبر را نشان می‌دهد)`;
+(importance یک عدد صحیح بین ۱ تا ۵ است. category دقیقاً یکی از مقادیر tech, economy, sport, world, social, culture, science, other است)`;
 
       try {
         const aiRes = await generateNewsRewrite({
@@ -166,6 +173,14 @@ export async function runScanForUser(userId, chatId = null) {
         const aiTitle = parsed.title || item.title;
         const aiSummary = parsed.summary || item.title;
         const importance = parsed.importance;
+        const itemCategory = parsed.category || item.category || 'tech';
+
+        // Check if category is enabled for this source
+        const allowedCategories = parseSourceCategories(item.sourceCategories);
+        if (!allowedCategories.includes(itemCategory)) {
+          console.log(`[Scanner] Item "${item.title}" categorized as "${itemCategory}", disabled for source "${item.sourceName}". Skipping.`);
+          continue;
+        }
 
         const formattedHtml = preparePostForPublishing({
           post: {
@@ -187,14 +202,15 @@ export async function runScanForUser(userId, chatId = null) {
           aiSummary,
           formattedHtml,
           imageUrl: item.imageUrl,
-          category: item.category,
+          category: itemCategory,
           importance,
         });
 
         publishedCount++;
 
-        // Auto-Publish
-        if (user.autoPublish && user.channelId) {
+        // Auto-Publish (only if enabled, channel is set, and NOT in draftOnly mode)
+        const canAutoPublish = user.autoPublish && user.channelId && !draftOnly;
+        if (canAutoPublish) {
           const sent = await sendRichPostSafe({
             chatId: user.channelId,
             postHtml: formattedHtml,
@@ -212,7 +228,8 @@ export async function runScanForUser(userId, chatId = null) {
     }
 
     if (chatId) {
-      if (user.autoPublish && user.channelId) {
+      const canAutoPublish = user.autoPublish && user.channelId && !draftOnly;
+      if (canAutoPublish) {
         await api.sendMessage({
           chat_id: notifyChat,
           text: `🚀 <b>پایش ساعتی تکمیل شد!</b> تعداد <b>${publishedCount}</b> خبر به طور مستقیم در کانال <code>${escHtml(user.channelId)}</code> منتشر شد.`,
@@ -220,9 +237,10 @@ export async function runScanForUser(userId, chatId = null) {
           reply_markup: mainMenuKeyboard(user),
         });
       } else {
+        const reason = draftOnly ? ' (حالت زمان‌بندی انتشار)' : '';
         await api.sendMessage({
           chat_id: notifyChat,
-          text: `📨 <b>پایش ساعتی تکمیل شد!</b> تعداد <b>${publishedCount}</b> خبر جدید با هوش مصنوعی آماده و به صف پیش‌نویس اضافه شد.\n\n👇 برای مشاهده و انتشار: /review`,
+          text: `📨 <b>پایش ساعتی تکمیل شد!</b> تعداد <b>${publishedCount}</b> خبر جدید آماده و به صف پیش‌نویس اضافه شد${reason}.\n\n👇 برای مشاهده و انتشار: /review`,
           parse_mode: 'HTML',
           reply_markup: reviewPostKeyboard(0),
         });
@@ -247,8 +265,10 @@ export async function runScanForUser(userId, chatId = null) {
 {
   "title": "تیتر جذاب",
   "summary": "خلاصه ۲ خطی",
-  "importance": 3
-}`;
+  "importance": 3,
+  "category": "tech"
+}
+(importance یک عدد صحیح بین ۱ تا ۵ است. category یکی از مقادیر tech, economy, sport, world, social, culture, science, other است)`;
 
     try {
       const aiRes = await generateNewsRewrite({
@@ -278,6 +298,14 @@ export async function runScanForUser(userId, chatId = null) {
       const aiTitle = parsed.title || item.title;
       const aiSummary = parsed.summary || item.title;
       const importance = parsed.importance;
+      const itemCategory = parsed.category || item.category || 'tech';
+
+      // Check if category is enabled for this source
+      const allowedCategories = parseSourceCategories(item.sourceCategories);
+      if (!allowedCategories.includes(itemCategory)) {
+        console.log(`[Scanner] Item "${item.title}" categorized as "${itemCategory}", disabled for source "${item.sourceName}". Skipping.`);
+        continue;
+      }
 
       processedItems.push({
         aiTitle,
@@ -306,7 +334,7 @@ export async function runScanForUser(userId, chatId = null) {
         aiSummary,
         formattedHtml: itemPostHtml,
         imageUrl: item.imageUrl,
-        category: item.category,
+        category: itemCategory,
         importance,
       });
 
@@ -326,13 +354,14 @@ export async function runScanForUser(userId, chatId = null) {
     footerText: user.footerText || (user.channelId ? `📢 کانال خبر : ${user.channelId}\n📢 کانال مرجع: @MyLeitner` : '📢 کانال خبر : @theNews_Persian\n📢 کانال مرجع: @MyLeitner'),
   });
 
-  // If autoPublish is ON, publish this single bulletin post directly to the channel!
-  if (user.autoPublish && user.channelId) {
+  // If autoPublish is ON and not in draftOnly mode, publish bulletin post to the channel
+  const canAutoPublish = user.autoPublish && user.channelId && !draftOnly;
+  if (canAutoPublish) {
     const sent = await sendRichPostSafe({
       chatId: user.channelId,
       postHtml: bulletinHtml,
-      buttons: null, // No inline button: full links are already inside the bulletin text
-      disableWebPagePreview: true, // No web page preview card or preview photo
+      buttons: null,
+      disableWebPagePreview: true,
     });
 
     if (sent && sent.message_id) {
@@ -343,7 +372,7 @@ export async function runScanForUser(userId, chatId = null) {
   }
 
   if (chatId) {
-    if (user.autoPublish && user.channelId) {
+    if (canAutoPublish) {
       await api.sendMessage({
         chat_id: notifyChat,
         text: `🗞️ <b>بولتن خبری ساعتی منتشر شد!</b>\nتعداد <b>${processedItems.length}</b> خبر در قالب یک پست تجمیعی واحد در کانال <code>${escHtml(user.channelId)}</code> منتشر شد.`,
@@ -351,9 +380,10 @@ export async function runScanForUser(userId, chatId = null) {
         reply_markup: mainMenuKeyboard(user),
       });
     } else {
+      const reason = draftOnly ? ' (حالت زمان‌بندی انتشار)' : '';
       await api.sendMessage({
         chat_id: notifyChat,
-        text: `🗞️ <b>بولتن ساعتی در انتظار تایید (${processedItems.length} خبر):</b>\n\n${bulletinHtml}`,
+        text: `🗞️ <b>بولتن ساعتی در انتظار تایید (${processedItems.length} خبر)${reason}:</b>\n\n${bulletinHtml}`,
         parse_mode: 'HTML',
         reply_markup: reviewPostKeyboard(savedPostIds[0] || 0),
       });
