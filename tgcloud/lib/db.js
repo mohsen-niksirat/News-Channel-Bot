@@ -384,3 +384,156 @@ export async function markPostPublished(postId, publishedMessageId) {
 export async function markPostRejected(postId) {
   await db.update(posts).set({ status: 'rejected' }).where(eq(posts.id, postId)).run();
 }
+
+// ---------------- Platform Admin Statistics ----------------
+export async function getAdminPlatformStats() {
+  const now = Math.floor(Date.now() / 1000);
+  const dayStart = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
+  const weekAgo = now - 7 * 86400;
+
+  // 1. Users
+  const allUsers = await db.select().from(users).all();
+  const totalUsers = allUsers.length;
+  const connectedChannels = allUsers.filter((u) => u.channelId && u.channelId.trim().length > 0).length;
+  const autoPublishCount = allUsers.filter((u) => Boolean(u.autoPublish)).length;
+  const joinedToday = allUsers.filter((u) => (u.createdAt || 0) >= dayStart).length;
+  const totalPublishedPosts = allUsers.reduce((sum, u) => sum + (u.postsPublishedCount || 0), 0);
+
+  // 2. Posts
+  const allPosts = await db.select({ id: posts.id, status: posts.status, createdAt: posts.createdAt }).from(posts).all();
+  const totalPosts = allPosts.length;
+  const publishedPosts = allPosts.filter((p) => p.status === 'published').length;
+  const draftPosts = allPosts.filter((p) => p.status === 'draft').length;
+  const rejectedPosts = allPosts.filter((p) => p.status === 'rejected').length;
+  const postsToday = allPosts.filter((p) => (p.createdAt || 0) >= dayStart).length;
+
+  // 3. Sources
+  const allSources = await db.select().from(sources).all();
+  const totalSources = allSources.length;
+  const enabledSources = allSources.filter((s) => Boolean(s.enabled)).length;
+  const rssSources = allSources.filter((s) => s.type === 'rss').length;
+  const telegramSources = allSources.filter((s) => s.type === 'telegram').length;
+
+  // 4. AI Keys
+  const allKeys = await db.select().from(aiKeys).all();
+  const totalKeys = allKeys.length;
+  const activeKeys = allKeys.filter((k) => k.status === 'active').length;
+  const cooldownKeys = allKeys.filter((k) => k.status === 'cooldown').length;
+  const deadKeys = allKeys.filter((k) => k.status === 'dead').length;
+  const keysByProvider = {};
+  for (const k of allKeys) {
+    const p = (k.provider || 'other').toUpperCase();
+    keysByProvider[p] = (keysByProvider[p] || 0) + 1;
+  }
+
+  // 5. Tokens
+  const allTokens = await db.select().from(tokenUsage).all();
+  let tokensToday = 0;
+  let promptToday = 0;
+  let completionToday = 0;
+  let tokensWeek = 0;
+  let tokensAllTime = 0;
+  const tokensByProvider = {};
+
+  for (const row of allTokens) {
+    const t = row.totalTokens || 0;
+    const p = row.promptTokens || 0;
+    const c = row.completionTokens || 0;
+    const created = row.createdAt || 0;
+    tokensAllTime += t;
+    if (created >= weekAgo) tokensWeek += t;
+    if (created >= dayStart) {
+      tokensToday += t;
+      promptToday += p;
+      completionToday += c;
+    }
+    const prov = (row.provider || 'other').toUpperCase();
+    tokensByProvider[prov] = (tokensByProvider[prov] || 0) + t;
+  }
+
+  return {
+    users: {
+      total: totalUsers,
+      connectedChannels,
+      autoPublishCount,
+      joinedToday,
+      totalPublishedPosts,
+    },
+    posts: {
+      total: totalPosts,
+      published: publishedPosts,
+      drafts: draftPosts,
+      rejected: rejectedPosts,
+      today: postsToday,
+    },
+    sources: {
+      total: totalSources,
+      enabled: enabledSources,
+      rss: rssSources,
+      telegram: telegramSources,
+    },
+    keys: {
+      total: totalKeys,
+      active: activeKeys,
+      cooldown: cooldownKeys,
+      dead: deadKeys,
+      byProvider: keysByProvider,
+    },
+    tokens: {
+      today: tokensToday,
+      promptToday,
+      completionToday,
+      week: tokensWeek,
+      allTime: tokensAllTime,
+      byProvider: tokensByProvider,
+    },
+  };
+}
+
+export function formatAdminStatsMessage(stats) {
+  const fNum = (n) => Number(n || 0).toLocaleString('fa-IR');
+  const nowStr = new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+  const dateStr = new Date().toLocaleDateString('fa-IR');
+
+  const provEntries = Object.entries(stats.tokens.byProvider);
+  const provLines = provEntries.length > 0
+    ? provEntries.map(([p, c]) => `  ├ <b>${p}</b>: <code>${fNum(c)}</code> توکن`).join('\n')
+    : '  └ <i>هنوز مصرفی ثبت نشده است</i>';
+
+  const keyEntries = Object.entries(stats.keys.byProvider);
+  const keyLines = keyEntries.length > 0
+    ? keyEntries.map(([p, c]) => `  ├ <b>${p}</b>: <code>${fNum(c)}</code> کلید`).join('\n')
+    : '  └ <i>کلیدی ثبت نشده است</i>';
+
+  return (
+    `👑 <b>مرکز کنترل و آمار جامع پلتفرم (Admin Panel)</b>\n` +
+    `📅 <i>تاریخ: ${dateStr} | ساعت: ${nowStr}</i>\n` +
+    `──────────────────────────\n\n` +
+    `👥 <b>وضعیت کاربران و شبکه:</b>\n` +
+    `• کل کاربران پلتفرم: <b>${fNum(stats.users.total)} نفر</b>\n` +
+    `• کانال‌های متصل فعال: <b>${fNum(stats.users.connectedChannels)} کانال</b>\n` +
+    `• انتشار خودکار روشن: <b>${fNum(stats.users.autoPublishCount)} کاربر</b>\n` +
+    `• کاربران ملحق‌شده امروز: <b>${fNum(stats.users.joinedToday)} نفر</b>\n\n` +
+    `📰 <b>مدیریت محتوا و انتشارات:</b>\n` +
+    `• کل اخبار پردازش‌شده: <b>${fNum(stats.posts.total)} خبر</b>\n` +
+    `• پست‌های منتشرشده در کانال‌ها: <b>${fNum(stats.posts.published)} پست</b>\n` +
+    `• پیش‌نویس‌های در صف بررسی: <b>${fNum(stats.posts.drafts)} مورد</b>\n` +
+    `• خبرهای رد شده: <b>${fNum(stats.posts.rejected)} مورد</b>\n` +
+    `• اخبار تولیدی امروز: <b>${fNum(stats.posts.today)} خبر</b>\n\n` +
+    `🤖 <b>مصرف توکن‌های هوش مصنوعی (کل سیستم):</b>\n` +
+    `• مصرف امروز: <b>${fNum(stats.tokens.today)}</b> (ورودی: ${fNum(stats.tokens.promptToday)} | خروجی: ${fNum(stats.tokens.completionToday)})\n` +
+    `• مصرف ۷ روز اخیر: <b>${fNum(stats.tokens.week)}</b> توکن\n` +
+    `• مجموع مصرف از ابتدا: <b>${fNum(stats.tokens.allTime)}</b> توکن\n` +
+    `تفکیک مصرف به ازای سرویس‌دهنده‌ها:\n${provLines}\n\n` +
+    `📡 <b>پایش و منابع خبری فعال:</b>\n` +
+    `• کل منابع: <b>${fNum(stats.sources.enabled)} از ${fNum(stats.sources.total)} منبع فعال</b>\n` +
+    `• فیدهای RSS وب: <b>${fNum(stats.sources.rss)}</b> | کانال‌های تلگرام: <b>${fNum(stats.sources.telegram)}</b>\n\n` +
+    `🔑 <b>استخر کلیدهای هوش مصنوعی:</b>\n` +
+    `• کلیدهای فعال و آماده: <b>${fNum(stats.keys.active)} از ${fNum(stats.keys.total)} کلید</b>\n` +
+    (stats.keys.cooldown > 0 ? `• در حال خنک‌سازی (Cooldown): <b>${fNum(stats.keys.cooldown)}</b>\n` : '') +
+    (stats.keys.dead > 0 ? `• کلیدهای منقضی/غیرفعال: <b>${fNum(stats.keys.dead)}</b>\n` : '') +
+    `توزیع کلیدها:\n${keyLines}\n` +
+    `──────────────────────────\n` +
+    `🛡️ <i>دسترسی انحصاری شناسه مدیریت: <code>${ADMIN_ID}</code></i>`
+  );
+}

@@ -17,6 +17,9 @@ import {
   getPostById,
   markPostPublished,
   markPostRejected,
+  ADMIN_ID,
+  getAdminPlatformStats,
+  formatAdminStatsMessage,
 } from 'lib/db';
 import { runScanForUser } from 'lib/scanner';
 import { generateNewsRewrite, ROUTING_POLICIES } from 'lib/ai_router';
@@ -34,6 +37,7 @@ import {
   channelSettingsKeyboard,
   publishModeKeyboard,
   healthCheckKeyboard,
+  adminStatsKeyboard,
   backToMenuKeyboard,
 } from 'lib/keyboards';
 
@@ -78,6 +82,49 @@ export default async function (query) {
   // 1.1 Fast Scan Action
   if (data === 'act:scan') {
     await runScanForUser(from.id, chatId);
+    return;
+  }
+
+  // 1.15 Admin Platform Stats (Strictly ADMIN_ID only)
+  if (data === 'm:admin_stats' || data === 'act:admin_stats_refresh') {
+    if (from.id !== ADMIN_ID) {
+      try {
+        await api.answerCallbackQuery({
+          callback_query_id: query.id,
+          text: '⛔ دسترسی غیرمجاز! این بخش انحصاراً مخصوص مدیر اصلی پلتفرم است.',
+          show_alert: true,
+        });
+      } catch {}
+      return;
+    }
+
+    const stats = await getAdminPlatformStats();
+    const msg = formatAdminStatsMessage(stats);
+
+    try {
+      await api.editMessageText({
+        chat_id: chatId,
+        message_id: messageId,
+        text: msg,
+        parse_mode: 'HTML',
+        reply_markup: adminStatsKeyboard(),
+      });
+      if (data === 'act:admin_stats_refresh') {
+        try {
+          await api.answerCallbackQuery({
+            callback_query_id: query.id,
+            text: '🔄 آمار زنده سیستم بروزرسانی شد.',
+          });
+        } catch {}
+      }
+    } catch {
+      await api.sendMessage({
+        chat_id: chatId,
+        text: msg,
+        parse_mode: 'HTML',
+        reply_markup: adminStatsKeyboard(),
+      });
+    }
     return;
   }
 

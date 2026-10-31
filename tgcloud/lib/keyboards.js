@@ -3,57 +3,92 @@
  */
 
 import { ROUTING_POLICIES } from 'lib/ai_router';
+import { ADMIN_ID } from 'lib/db';
 
 export function mainMenuKeyboard(user) {
-  const autoPubStatus = user.autoPublish ? 'روشن 🚀' : 'دستی 📑';
+  const autoPubStatus = user?.autoPublish ? 'روشن 🚀' : 'دستی 📑';
   const miniAppUrl = 'https://app9260009899.tgcloud.ai/?uid=' + (user?.tgId || '');
-  return {
-    inline_keyboard: [
-      [
-        { text: '📱 مینی‌اپ داشبورد پیشرفته (Mini App)', web_app: { url: miniAppUrl } },
-      ],
-      [
-        { text: '🔍 اسکن فوری منابع', callback_data: 'act:scan' },
-        { text: '📑 صف بررسی پیش‌نویس‌ها', callback_data: 'm:review:0' },
-      ],
-      [
-        { text: '📡 مدیریت منابع خبری', callback_data: 'm:sources' },
-        { text: '🤖 کلیدها و روتر هوش مصنوعی', callback_data: 'm:ai' },
-      ],
-      [
-        { text: `📢 تنظیمات کانال (${autoPubStatus})`, callback_data: 'm:channel' },
-        { text: '🗞️ روزنامه امروز', callback_data: 'act:digest' },
-      ],
-      [
-        { text: '📊 آمار مصرف توکن‌ها', callback_data: 'm:token_stats' },
-        { text: '📢 کانال رسمی @MyLeitner', url: 'https://t.me/MyLeitner' },
-      ],
+  const rows = [
+    [
+      { text: '📱 مینی‌اپ داشبورد پیشرفته (Mini App)', web_app: { url: miniAppUrl } },
     ],
+    [
+      { text: '🔍 اسکن فوری منابع', callback_data: 'act:scan' },
+      { text: '📑 صف بررسی پیش‌نویس‌ها', callback_data: 'm:review:0' },
+    ],
+    [
+      { text: '📡 مدیریت منابع خبری', callback_data: 'm:sources' },
+      { text: '🤖 کلیدها و روتر هوش مصنوعی', callback_data: 'm:ai' },
+    ],
+    [
+      { text: `📢 تنظیمات کانال (${autoPubStatus})`, callback_data: 'm:channel' },
+      { text: '🗞️ روزنامه امروز', callback_data: 'act:digest' },
+    ],
+    [
+      { text: '📊 آمار مصرف توکن‌ها', callback_data: 'm:token_stats' },
+      { text: '📢 کانال رسمی @MyLeitner', url: 'https://t.me/MyLeitner' },
+    ],
+  ];
+
+  if (user && (user.tgId === ADMIN_ID || user.id === ADMIN_ID)) {
+    rows.push([
+      { text: '👑 پنل آمار کل پلتفرم (Admin)', callback_data: 'm:admin_stats' },
+    ]);
+  }
+
+  return {
+    inline_keyboard: rows,
   };
 }
 
 export function mainReplyKeyboard(userId = null) {
   const miniAppUrl = 'https://app9260009899.tgcloud.ai/' + (userId ? `?uid=${userId}` : '');
-  return {
-    keyboard: [
-      [
-        { text: '📱 باز کردن مینی‌اپ داشبورد', web_app: { url: miniAppUrl } },
-      ],
-      [
-        { text: '🔍 اسکن فوری منابع' },
-        { text: '📑 صف بررسی' },
-      ],
-      [
-        { text: '📡 منابع خبری' },
-        { text: '🤖 هوش مصنوعی' },
-      ],
-      [
-        { text: '📢 تنظیمات کانال' },
-        { text: '🗞️ دریافت روزنامه' },
-      ],
+  const rows = [
+    [
+      { text: '📱 باز کردن مینی‌اپ داشبورد', web_app: { url: miniAppUrl } },
     ],
+    [
+      { text: '🔍 اسکن فوری منابع' },
+      { text: '📑 صف بررسی' },
+    ],
+    [
+      { text: '📡 منابع خبری' },
+      { text: '🤖 هوش مصنوعی' },
+    ],
+    [
+      { text: '📢 تنظیمات کانال' },
+      { text: '🗞️ دریافت روزنامه' },
+    ],
+  ];
+
+  if (userId === ADMIN_ID) {
+    rows.push([
+      { text: '👑 آمار مدیریت سیستم' },
+    ]);
+  }
+
+  return {
+    keyboard: rows,
     resize_keyboard: true,
     input_field_placeholder: 'گزینه‌ای انتخاب کنید یا متنی برای خلاصه بفرستید...',
+  };
+}
+
+export function adminStatsKeyboard() {
+  return {
+    inline_keyboard: [
+      [
+        { text: '🔄 بروزرسانی آمار زنده', callback_data: 'act:admin_stats_refresh' },
+        { text: '🔍 اجرای اسکن فوری', callback_data: 'act:scan' },
+      ],
+      [
+        { text: '🤖 مدیریت هوش مصنوعی', callback_data: 'm:ai' },
+        { text: '📡 مدیریت منابع', callback_data: 'm:sources' },
+      ],
+      [
+        { text: '🔙 بازگشت به منوی اصلی', callback_data: 'm:menu' },
+      ],
+    ],
   };
 }
 

@@ -22,6 +22,8 @@ import {
   getPostById,
   markPostPublished,
   markPostRejected,
+  ADMIN_ID,
+  getAdminPlatformStats,
 } from 'lib/db';
 import { harvestTelegramChannel, harvestRssFeed } from 'lib/harvester';
 import { runHealthCheckForUser } from 'lib/health_check';
@@ -38,24 +40,36 @@ export default async function (input, ctx) {
     return { ok: false, error: 'User ID is required' };
   }
 
+  // Admin Platform Stats (Strictly Admin only)
+  if (action === 'get_admin_stats') {
+    if (userId !== ADMIN_ID) {
+      return { ok: false, error: 'دسترسی غیرمجاز: مخصوص مدیریت کل سیستم' };
+    }
+    const stats = await getAdminPlatformStats();
+    return { ok: true, stats };
+  }
+
   let user = await getUser(userId);
   if (!user) {
-    return {
-      ok: true,
-      user: {
-        tgId: userId,
-        channelId: '',
-        autoPublish: false,
-        routingPolicy: 'fallback',
-        preferredProvider: 'gemini',
-        footerText: '',
-      },
-      keys: [],
-      sources: [],
-      customProviders: [],
-      tokenStats: { today: { total: 0 }, allTime: 0 },
-      drafts: [],
-    };
+    if (action === 'get_data') {
+      return {
+        ok: true,
+        user: {
+          tgId: userId,
+          channelId: '',
+          autoPublish: false,
+          routingPolicy: 'fallback',
+          preferredProvider: 'gemini',
+          footerText: '',
+        },
+        keys: [],
+        sources: [],
+        customProviders: [],
+        tokenStats: { today: { total: 0 }, allTime: 0 },
+        drafts: [],
+      };
+    }
+    return { ok: false, error: 'User not found' };
   }
 
   // 1. Get complete dashboard data
@@ -65,6 +79,10 @@ export default async function (input, ctx) {
     const customProv = await getCustomProviders(userId);
     const tokenStats = await getTokenUsageStats(userId);
     const drafts = await getDraftPosts(userId, 10);
+    let adminStats = null;
+    if (userId === ADMIN_ID) {
+      adminStats = await getAdminPlatformStats();
+    }
 
     return {
       ok: true,
@@ -99,6 +117,7 @@ export default async function (input, ctx) {
       customProviders: customProv,
       tokenStats,
       drafts,
+      adminStats,
     };
   }
 
@@ -266,6 +285,15 @@ export default async function (input, ctx) {
       return { ok: true, message: 'Source deleted' };
     }
     return { ok: false, error: 'شناسه منبع نامعتبر است.' };
+  }
+
+  // 12. Get Admin Platform Stats (Admin Only)
+  if (action === 'get_admin_stats') {
+    if (userId !== ADMIN_ID) {
+      return { ok: false, error: 'دسترسی غیرمجاز: مخصوص مدیریت کل سیستم' };
+    }
+    const stats = await getAdminPlatformStats();
+    return { ok: true, stats };
   }
 
   return { ok: false, error: 'Unknown action' };

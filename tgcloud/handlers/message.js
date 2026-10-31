@@ -17,6 +17,9 @@ import {
   saveDraftPost,
   getDraftPosts,
   markPostPublished,
+  ADMIN_ID,
+  getAdminPlatformStats,
+  formatAdminStatsMessage,
 } from 'lib/db';
 import { runScanForUser } from 'lib/scanner';
 import { generateNewsRewrite, ROUTING_POLICIES } from 'lib/ai_router';
@@ -30,6 +33,7 @@ import {
   aiSettingsKeyboard,
   channelSettingsKeyboard,
   healthCheckKeyboard,
+  adminStatsKeyboard,
   backToMenuKeyboard,
 } from 'lib/keyboards';
 
@@ -422,6 +426,34 @@ export default async function (message) {
       text: msg,
       parse_mode: 'HTML',
       reply_markup: backToMenuKeyboard(),
+    });
+    return;
+  }
+
+  // 6.5. Admin Platform Stats Command (Strictly ADMIN_ID only)
+  if (
+    text === '/admin' ||
+    text === '/admin_stats' ||
+    text === '/stats_admin' ||
+    text === '👑 آمار مدیریت سیستم' ||
+    text.includes('آمار مدیریت')
+  ) {
+    if (from.id !== ADMIN_ID) {
+      await api.sendMessage({
+        chat_id: chat.id,
+        text: '⛔ <b>دسترسی غیرمجاز!</b> این بخش انحصاراً برای مدیریت کل سیستم تعبیه شده است.',
+        parse_mode: 'HTML',
+      });
+      return;
+    }
+
+    const stats = await getAdminPlatformStats();
+    const msg = formatAdminStatsMessage(stats);
+    await api.sendMessage({
+      chat_id: chat.id,
+      text: msg,
+      parse_mode: 'HTML',
+      reply_markup: adminStatsKeyboard(),
     });
     return;
   }
