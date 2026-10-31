@@ -110,12 +110,22 @@ export function parseAiNewsJson(rawText) {
             }
           }
 
+          let category = null;
+          if (parsed.category && typeof parsed.category === 'string') {
+            const cleanCat = parsed.category.toLowerCase().trim();
+            const valid = ['tech', 'economy', 'sport', 'world', 'social', 'culture', 'science', 'other'];
+            if (valid.includes(cleanCat)) {
+              category = cleanCat;
+            }
+          }
+
           return {
             success: true,
             title,
             summary,
             details: detailsText,
             importance,
+            category,
             mode: 'json',
           };
         }
@@ -141,6 +151,7 @@ export function parseAiNewsJson(rawText) {
       summary,
       details,
       importance: null,
+      category: null,
       mode: 'legacy',
     };
   }
@@ -153,6 +164,7 @@ export function parseAiNewsJson(rawText) {
     summary: clean.slice(0, 200),
     details: '',
     importance: null,
+    category: null,
     mode: 'raw',
   };
 }
