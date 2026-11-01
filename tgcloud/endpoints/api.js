@@ -19,6 +19,7 @@ import {
   deleteAiKey,
   toggleSource,
   deleteSource,
+  addSource,
   getPostById,
   markPostPublished,
   markPostRejected,
@@ -483,6 +484,16 @@ export default async function (input, ctx) {
       return { ok: true, message: 'Source deleted' };
     }
     return { ok: false, error: 'شناسه منبع نامعتبر است.' };
+  }
+
+  // 12. Add Source
+  if (action === 'add_source') {
+    const { name, type, urlOrHandle, lang = 'fa', category = 'tech' } = input;
+    if (!name || !urlOrHandle) {
+      return { ok: false, error: 'نام و آدرس منبع الزامی است.' };
+    }
+    const created = await addSource(userId, { name, type: type || 'rss', urlOrHandle, lang, category });
+    return { ok: true, source: created };
   }
 
   return { ok: false, error: 'Unknown action' };
