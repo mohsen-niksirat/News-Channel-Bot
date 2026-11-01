@@ -184,7 +184,7 @@ export async function sendRichPostSafe({
 }) {
   let safeImageUrl = normalizeSafeImageUrl(imageUrl);
   const isPhoto = Boolean(safeImageUrl);
-  const maxLen = isPhoto ? 1000 : 4090;
+  const maxLen = isPhoto ? 1024 : 4090;
 
   let safeContent = postHtml;
   if (safeContent.length > maxLen) {
@@ -308,46 +308,63 @@ export function preparePostForPublishing({ post, user, details = null }) {
     }
   }
 
-  let body = '';
-  if (title) {
-    body += `🔹 <b>${escHtml(title)}</b>\n\n`;
+  // 1. Guaranteed Bottom Section (Source Link + Divider + Footer)
+  let bottom = '';
+  if (sourceUrl) {
+    bottom += `🔗 <a href="${sourceUrl}">مطالعه متن کامل در ${escHtml(sourceName)}</a>\n\n`;
+  }
+  const safeFooter = (footerText.includes('<') && footerText.includes('>'))
+    ? footerText
+    : escHtml(footerText);
+  bottom += `──────────────────\n${safeFooter}`;
+
+  // 2. Title Section
+  const titlePart = title ? `🔹 <b>${escHtml(title)}</b>\n\n` : '';
+
+  // 3. Middle Content Budgeting
+  // Telegram photo caption maximum limit is 1024 characters.
+  // We reserve budget so that title + summary + bullets + bottom is strictly <= 980 chars,
+  // ensuring the footer and source link are NEVER truncated or lost.
+  const hasPhoto = Boolean(post?.imageUrl);
+  const targetMaxLen = hasPhoto ? 980 : 3800;
+  const maxMiddleBudget = targetMaxLen - titlePart.length - bottom.length - 15;
+
+  let bulletPart = '';
+  if (rawDetails) {
+    const detailList = (Array.isArray(rawDetails) ? rawDetails : [rawDetails])
+      .map((d) => String(d).trim())
+      .filter((d) => d.length > 0)
+      .slice(0, hasPhoto ? 2 : 4);
+    if (detailList.length > 0) {
+      bulletPart = detailList
+        .map((d) => `▫️ ${escHtml(d.replace(/^[▫️•\-\*]\s*/, ''))}`)
+        .join('\n') + '\n\n';
+    }
   }
 
-  if (summary) {
-    body += `${escHtml(summary)}\n\n`;
-  } else if (post?.formattedHtml) {
+  let cleanSummary = summary;
+  if (!cleanSummary && post?.formattedHtml) {
     let clean = post.formattedHtml;
     if (clean.includes('──────────────') || clean.includes('──────────────────')) {
       clean = clean.split(/──────────────|──────────────────/)[0].trim();
     }
     clean = clean.replace(/🔗\s*<a\s+href="[^"]*">[^<]*<\/a>/gi, '').trim();
     clean = clean.replace(/^[⚡🔹]\s*/, '').trim();
-    if (clean) {
-      body += `${clean}\n\n`;
-    }
+    cleanSummary = clean;
   }
 
-  if (rawDetails) {
-    const detailList = Array.isArray(rawDetails) ? rawDetails : [rawDetails];
-    const bulletLines = detailList
-      .map((d) => String(d).trim())
-      .filter((d) => d.length > 0)
-      .map((d) => `▫️ ${escHtml(d.replace(/^[▫️•\-\*]\s*/, ''))}`)
-      .join('\n');
-    if (bulletLines) {
-      body += `${bulletLines}\n\n`;
-    }
+  const maxSummaryLen = maxMiddleBudget - bulletPart.length;
+  if (cleanSummary && cleanSummary.length > maxSummaryLen) {
+    const trimmed = cleanSummary.slice(0, Math.max(50, maxSummaryLen - 4));
+    const lastSpace = trimmed.lastIndexOf(' ');
+    cleanSummary = (lastSpace > 50 ? trimmed.slice(0, lastSpace) : trimmed) + '...';
   }
 
-  if (sourceUrl) {
-    body += `🔗 <a href="${sourceUrl}">مطالعه متن کامل در ${escHtml(sourceName)}</a>\n\n`;
-  }
+  const safeSummaryText = (cleanSummary && cleanSummary.includes('<') && cleanSummary.includes('>'))
+    ? cleanSummary
+    : escHtml(cleanSummary);
+  const summaryPart = cleanSummary ? `${safeSummaryText}\n\n` : '';
 
-  const safeFooter = (footerText.includes('<') && footerText.includes('>'))
-    ? footerText
-    : escHtml(footerText);
-
-  body += `──────────────────\n${safeFooter}`;
-
+  const body = `${titlePart}${summaryPart}${bulletPart}${bottom}`;
   return body.trim();
 }
