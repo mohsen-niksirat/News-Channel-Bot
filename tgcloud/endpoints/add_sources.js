@@ -1,5 +1,5 @@
 import { addSource, ADMIN_ID } from 'lib/db';
-import { validateApiAuth } from 'endpoints/api';
+import { validateApiAuth } from 'lib/auth';
 
 const NEW_SOURCES = [
   {

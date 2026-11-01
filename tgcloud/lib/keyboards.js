@@ -4,7 +4,7 @@
 
 import { ROUTING_POLICIES } from 'lib/ai_router';
 import { ADMIN_ID } from 'lib/db';
-import { computeSignedToken } from 'endpoints/api';
+import { computeSignedToken } from 'lib/auth';
 import { TONE_PROFILES } from 'lib/tones';
 import { VALID_CATEGORIES, CATEGORY_LABELS, parseSourceCategories } from 'lib/categories';
 import { parseScheduleWindows, formatScheduleWindowsPersian } from 'lib/schedule';
