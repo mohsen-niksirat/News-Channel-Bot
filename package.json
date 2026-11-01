@@ -1,6 +1,6 @@
 {
   "name": "news-studio-bot",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "AI-Powered Telegram News Studio & Channel Manager with Multi-Provider AI Router and Rasa Rich Post Engine",
   "type": "module",
   "scripts": {

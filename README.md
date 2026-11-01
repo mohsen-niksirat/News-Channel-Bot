@@ -59,6 +59,10 @@
    - امکان فوروارد کردن هر پیام، متن یا خبر طولانی از چت‌ها یا کانال‌ها به ربات جهت تبدیل فوری به پست کانال.
 10. **📑 صف بررسی پیش‌نویس‌ها و انتشار مستقیم:**
     - قابلیت فعال‌سازی انتشار خودکار (Auto-Publish) یا بررسی دستی با دکمه‌های ✅ انتشار، 🔁 بازنویسی و ❌ رد.
+11. **🎨 ۶ پروفایل متنوع لحن نگارش هوش مصنوعی (`/tone`):**
+    - پشتیبانی از سبک‌های رسمی، تحلیلی، صمیمی، طنز، دراماتیک و فوق‌خلاصه مینیمال با امکان تنظیم پرامپت دلخواه.
+12. **📱 مینی‌اپ داشبورد زنده (Telegram Mini App):**
+    - رابط شیشه‌ای مدرن جهت مدیریت لحظه‌ای پیش‌نویس‌ها، کلیدها، فیدها، تست سلامت و مصرف توکن‌ها.
 
 ---
 
@@ -165,6 +169,8 @@ npx tgcloud push
 - **🧪 Key Health & Model Inspector (`/testkeys` & Nightly Ping):** Live latency test + automated nightly ping to detect dead or cooldown keys without alert spam.
 - **🗞️ Anti-Spam Hourly Bulletin Aggregator:** Automatically bundles 3+ news items into a single editorial digest with clickable hyperlinks `<a href="...">` to preserve channel readability.
 - **⏱️ Schedule Windows & Daily Newspaper (`/schedule` & `/newspaper`):** Publish posts within designated daily windows (Tehran Time) and receive a 24-hour morning newspaper digest.
+- **🎨 6 Editorial Tone Profiles (`/tone`):** Standard formal, journalistic analysis, conversational, satirical critique, dramatic/breaking, and minimal summary with custom prompt overrides.
+- **📱 Real-time Glassmorphic Mini App:** Manage drafts, sources, keys, live scans, health checks, and token costs directly from Telegram WebApp.
 - **📊 Real-time Token Analytics & Cost Transparency (`/tokens`):** Track token consumption by day, week, month, key, and provider, with live USD cost calculations based on official rates per 1M tokens.
 - **📨 On-Demand Forward Summarizer:** Forward any long article, tweet, or message to turn it into an engaging Telegram post.
 
@@ -179,6 +185,7 @@ npx tgcloud push
 | `/review` | 📑 Open the draft review queue |
 | `/newspaper` | 🗞️ Generate a custom newspaper edition |
 | `/schedule` | ⏱️ Configure automated publishing time windows |
+| `/tone` | 🎨 Configure AI journalistic tone and editorial style |
 | `/sources` | 📡 Manage RSS feeds and Telegram sources |
 | `/ai` | 🤖 AI key pool, routing policies & custom providers |
 | `/testkeys` | 🧪 Live key health check & active model discovery |
