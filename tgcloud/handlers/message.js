@@ -470,7 +470,38 @@ export default async function (message) {
   }
 
   // 5. AI Settings Command
-  if (text === '/keys' || text === '🤖 هوش مصنوعی') {
+  if (text === '/channel' || text === '📢 تنظیمات کانال' || text === '📢 تنظیمات کانال و امضا') {
+    await api.sendMessage({
+      chat_id: chat.id,
+      text:
+        `📢 <b>تنظیمات کانال اختصاصی شما:</b>\n\n` +
+        `کانال متصل: <b>${escHtml(user.channelId || 'تنظیم نشده')}</b>\n` +
+        `حالت انتشار: <b>${user.autoPublish ? 'خودکار 🚀' : 'دستی (صف بررسی) 📑'}</b>\n` +
+        `امضا و فوتر: <code>${escHtml(user.footerText || 'تنظیم‌نشده')}</code>\n\n` +
+        `<i>برای تغییر وضعیت انتشار به دستی (صف بررسی) یا بالعکس، دکمه زیر را لمس کنید:</i>`,
+      parse_mode: 'HTML',
+      reply_markup: channelSettingsKeyboard(user),
+    });
+    return;
+  }
+
+  // 5.1. Sources Management Command
+  if (text === '/sources' || text === '📡 مدیریت منابع' || text === '📡 مدیریت منابع خبری') {
+    const sources = await getUserSources(from.id);
+    await api.sendMessage({
+      chat_id: chat.id,
+      text:
+        `📡 <b>مدیریت فیدها و منابع خبری:</b>\n\n` +
+        `تعداد کل منابع فعال: <b>${sources.length}</b> منبع\n` +
+        `برای افزودن منبع جدید (RSS یا کانال تلگرام) یا غیرفعال‌سازی، از دکمه‌های زیر استفاده کنید:`,
+      parse_mode: 'HTML',
+      reply_markup: sourcesManagementKeyboard(sources),
+    });
+    return;
+  }
+
+  // 5.2. AI Settings Command
+  if (text === '/keys' || text === '/ai' || text === '🤖 هوش مصنوعی') {
     const keysList = await getAiKeys(from.id);
     const cpList = await getCustomProviders(from.id);
     const policy = ROUTING_POLICIES[user.routingPolicy || 'fallback']?.name || 'فالبک اولویتی';

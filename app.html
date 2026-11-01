@@ -848,8 +848,10 @@
         showToast('حالت دستی (صف پیش‌نویس) فعال شد');
       }
 
+      callServerless('update_settings', { autoPublish: appState.user.autoPublish });
+
       if (tg?.sendData) {
-        tg.sendData(JSON.stringify({ action: 'toggle_autopub' }));
+        try { tg.sendData(JSON.stringify({ action: 'toggle_autopub' })); } catch (e) {}
       }
     }
 
