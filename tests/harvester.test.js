@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseJinaTelegramMarkdown, hashString, cleanText, harvestRssFeed } from 'lib/harvester';
+import { parseJinaTelegramMarkdown, hashString, cleanText, harvestRssFeed, isValidNewsImageUrl } from 'lib/harvester';
 import { setMockFetch } from 'sdk';
 
 test('hashString stability: produces consistent and deterministic hex hashes', () => {
@@ -67,4 +67,22 @@ test('harvestRssFeed: extracts items from RSS feed XML via mock fetch', async ()
   assert.equal(items[0].title.includes('نوکیا ۲۳۶۰'), true);
   assert.equal(items[0].imageUrl, 'https://api2.zoomit.ir/media/nokia.jpg');
   assert.equal(items[1].title.includes('تایمکس'), true);
+});
+
+test('isValidNewsImageUrl: strictly rejects Telegram emojis, avatars, favicons and allows genuine news photos', () => {
+  // Invalid images (must be rejected)
+  assert.equal(isValidNewsImageUrl('https://telegram.org/img/emoji/40/1f53b.png'), false); // Red triangle emoji
+  assert.equal(isValidNewsImageUrl('https://telegram.org/img/emoji/40/1f5a4.png'), false); // Black heart emoji
+  assert.equal(isValidNewsImageUrl('https://cdn4.telesco.pe/file/user_photo.jpg'), false); // Avatar
+  assert.equal(isValidNewsImageUrl('https://example.com/favicon.ico'), false); // Favicon
+  assert.equal(isValidNewsImageUrl('https://example.com/site_icon.png'), false); // Site icon
+  assert.equal(isValidNewsImageUrl('https://example.com/sticker.tgs'), false); // Sticker
+  assert.equal(isValidNewsImageUrl('https://example.com/icon.svg'), false); // SVG icon
+  assert.equal(isValidNewsImageUrl(''), false);
+  assert.equal(isValidNewsImageUrl(null), false);
+
+  // Valid genuine news photos (must be accepted)
+  assert.equal(isValidNewsImageUrl('https://cdn4.telesco.pe/file/ABCDEF1234567890.jpg'), true);
+  assert.equal(isValidNewsImageUrl('https://zoomit.ir/media/2026/10/nokia_phone_banner.webp'), true);
+  assert.equal(isValidNewsImageUrl('https://techcrunch.com/wp-content/uploads/2026/10/datacenter.jpg'), true);
 });

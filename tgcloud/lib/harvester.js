@@ -8,6 +8,32 @@ import { fetch } from 'sdk';
 import { cachedFetchText, globalJinaCache } from 'lib/cache';
 
 /**
+ * Validates that an image URL is a genuine news photo,
+ * strictly rejecting Telegram emojis, stickers, user avatars, favicons, and SVGs.
+ */
+export function isValidNewsImageUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  const clean = url.trim();
+  if (clean.length < 15) return false;
+  const lower = clean.toLowerCase();
+
+  // Reject Telegram emojis, reactions, and stickers
+  if (lower.includes('/emoji/') || lower.includes('telegram.org/img/emoji') || lower.includes('/emojis/')) return false;
+  if (lower.includes('emoji.php') || lower.includes('/twemoji/') || lower.includes('sticker') || lower.includes('.tgs')) return false;
+
+  // Reject channel avatars and user profile icons
+  if (lower.includes('user_photo') || lower.includes('/avatar') || lower.includes('profile_photo') || lower.includes('userpic')) return false;
+
+  // Reject website favicons and site icons
+  if (lower.includes('site_icon') || lower.includes('favicon') || lower.includes('.ico')) return false;
+
+  // Reject vector icons and tracking pixels
+  if (lower.endsWith('.svg') || lower.includes('.svg?') || lower.includes('1x1') || lower.includes('pixel')) return false;
+
+  return true;
+}
+
+/**
  * Pure JS fast 64-bit hash (no WebCrypto / no crypto.subtle dependency)
  */
 export function hashString(str) {
@@ -66,12 +92,15 @@ export function parseJinaTelegramMarkdown(md, cleanHandle) {
     const nextIdx = matches[i + 1] ? matches[i + 1].index : md.length;
     const chunk = md.substring(cur.index, nextIdx);
 
-    // Image URL extraction (checks nearby text)
+    // Image URL extraction (checks nearby text, strictly rejecting emojis/avatars)
     const preText = md.substring(Math.max(0, cur.index - 350), cur.index);
     let imageUrl = null;
-    const imgMatch = (preText + chunk).match(/!\[.*?\]\((https:\/\/[^\)]+\.(?:jpg|jpeg|png|webp)[^\)]*)\)/i);
-    if (imgMatch) {
-      imageUrl = imgMatch[1];
+    const allImgMatches = Array.from((preText + chunk).matchAll(/!\[.*?\]\((https:\/\/[^\)]+\.(?:jpg|jpeg|png|webp)[^\)]*)\)/gi));
+    for (const match of allImgMatches) {
+      if (isValidNewsImageUrl(match[1])) {
+        imageUrl = match[1];
+        break;
+      }
     }
 
     let plain = chunk
@@ -138,17 +167,27 @@ export function parseTelegramWebHtml(html, cleanHandle) {
     if (!plain || plain.length < 20) continue;
 
     let imageUrl = null;
-    const imgMatch = chunk.match(/background-image:\s*url\(['"]?([^'")]+)['"]?\)/i) || chunk.match(/<img[^>]+src=["']([^"']+)["']/i);
-    if (imgMatch) {
-      imageUrl = imgMatch[1].trim();
-      if (imageUrl.startsWith('//')) {
-        imageUrl = 'https:' + imageUrl;
+    // Extract strictly from dedicated Telegram message media wrappers (reject avatars, site icons, and custom emojis)
+    const photoWrapMatch = chunk.match(/class="[^"]*tgme_widget_message_photo_wrap[^"]*"[^>]*style="[^"]*background-image:\s*url\(['"]?([^'")]+)['"]?\)/i) ||
+                           chunk.match(/style="[^"]*background-image:\s*url\(['"]?([^'")]+)['"]?\)[^"]*class="[^"]*tgme_widget_message_photo_wrap/i);
+    const videoPosterMatch = chunk.match(/<video[^>]+poster=["']([^"']+)["']/i);
+    const linkPreviewMatch = chunk.match(/class="[^"]*link_preview_image[^"]*"[^>]*style="[^"]*background-image:\s*url\(['"]?([^'")]+)['"]?\)/i);
+
+    const candidateImg = photoWrapMatch?.[1] || videoPosterMatch?.[1] || linkPreviewMatch?.[1] || null;
+
+    if (candidateImg) {
+      let cleaned = candidateImg.trim();
+      if (cleaned.startsWith('//')) {
+        cleaned = 'https:' + cleaned;
       }
-      if (imageUrl.includes('googleusercontent.com') || imageUrl.includes('translate.google')) {
-        const uMatch = imageUrl.match(/[?&]u=([^&]+)/);
+      if (cleaned.includes('googleusercontent.com') || cleaned.includes('translate.google')) {
+        const uMatch = cleaned.match(/[?&]u=([^&]+)/);
         if (uMatch) {
-          try { imageUrl = decodeURIComponent(uMatch[1]); } catch {}
+          try { cleaned = decodeURIComponent(uMatch[1]); } catch {}
         }
+      }
+      if (isValidNewsImageUrl(cleaned)) {
+        imageUrl = cleaned;
       }
     }
 

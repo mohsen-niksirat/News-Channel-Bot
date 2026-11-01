@@ -4,6 +4,7 @@
  */
 
 import { api } from 'sdk';
+import { isValidNewsImageUrl } from 'lib/harvester';
 
 /**
  * Escapes characters for Telegram HTML parse mode
@@ -164,7 +165,7 @@ export async function sendRichPostSafe({
   buttons = null,
   disableWebPagePreview = false,
 }) {
-  let safeImageUrl = imageUrl ? String(imageUrl).trim() : null;
+  let safeImageUrl = (imageUrl && isValidNewsImageUrl(imageUrl)) ? String(imageUrl).trim() : null;
   if (safeImageUrl && safeImageUrl.startsWith('//')) {
     safeImageUrl = 'https:' + safeImageUrl;
   }
