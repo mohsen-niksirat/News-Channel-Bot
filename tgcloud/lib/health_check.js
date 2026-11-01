@@ -8,6 +8,7 @@ import { fetch, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { aiKeys } from 'schema';
 import { getAiKeys, getCustomProviders } from 'lib/db';
+import { markKeyResult } from 'lib/ai_router';
 
 function maskKey(key) {
   if (!key || key.length < 10) return '••••••••';
@@ -240,3 +241,94 @@ export async function runHealthCheckForUser(userId) {
     html: header + reportsText + footer,
   };
 }
+
+/**
+ * Nightly Key Health Ping
+ * Pings each key with a 10-token prompt.
+ * Reuses markKeyResult to transition status (401/403 -> dead, 429 -> cooldown, 200 -> active).
+ * Only returns changed: true and a formatted report if at least one key's status changed.
+ */
+export async function runNightlyKeyHealthCheck(userId) {
+  const keys = await getAiKeys(userId);
+  if (!keys || keys.length === 0) {
+    return { changed: false, totalKeys: 0 };
+  }
+
+  const customProviders = await getCustomProviders(userId);
+  const cpMap = new Map(customProviders.map((cp) => [cp.slug, cp]));
+  const statusChanges = [];
+
+  for (const k of keys) {
+    const prevStatus = k.status || 'active';
+    let newStatus = prevStatus;
+    let statusCode = 200;
+    let errMsg = '';
+
+    try {
+      if (k.provider === 'gemini') {
+        await testGeminiKey(k.apiKey);
+      } else if (k.provider === 'groq') {
+        await testGroqKey(k.apiKey);
+      } else if (k.provider === 'deepseek') {
+        await testDeepSeekKey(k.apiKey);
+      } else if (k.provider && k.provider.startsWith('c_')) {
+        const cp = cpMap.get(k.provider);
+        await testCustomKey(k, cp);
+      } else {
+        await testCustomKey(k, { baseUrl: 'https://api.openai.com/v1', defaultModel: 'gpt-4o-mini' });
+      }
+      await markKeyResult(k.id, true, 200);
+      newStatus = 'active';
+    } catch (err) {
+      errMsg = err.message || 'Connection error';
+      statusCode = 500;
+      if (errMsg.includes('401')) statusCode = 401;
+      else if (errMsg.includes('402')) statusCode = 402;
+      else if (errMsg.includes('403')) statusCode = 403;
+      else if (errMsg.includes('429')) statusCode = 429;
+
+      await markKeyResult(k.id, false, statusCode);
+      if (statusCode === 401 || statusCode === 402 || statusCode === 403) {
+        newStatus = 'dead';
+      } else if (statusCode === 429) {
+        newStatus = 'cooldown';
+      }
+    }
+
+    if (newStatus !== prevStatus) {
+      statusChanges.push({
+        keyId: k.id,
+        label: k.label || k.provider,
+        masked: maskKey(k.apiKey),
+        prevStatus,
+        newStatus,
+        error: errMsg,
+      });
+    }
+  }
+
+  if (statusChanges.length === 0) {
+    return { changed: false, totalKeys: keys.length };
+  }
+
+  const lines = statusChanges.map((sc) => {
+    const icon = sc.newStatus === 'active' ? '🟢' : sc.newStatus === 'cooldown' ? '🟡' : '🔴';
+    const statusFa = sc.newStatus === 'active' ? 'فعال شد' : sc.newStatus === 'cooldown' ? 'در حال خنک‌سازی (429)' : 'غیرفعال / منقضی (Dead)';
+    return `${icon} <b>${sc.label}</b> (<code>${sc.masked}</code>): تغییر به <b>${statusFa}</b>${sc.error ? `\n   ⚠️ علت: <code>${sc.error.slice(0, 80)}</code>` : ''}`;
+  }).join('\n\n');
+
+  const report =
+    `🌙 <b>گزارش شبانه پایش سلامت کلیدهای هوش مصنوعی</b>\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `⚠️ وضعیت <b>${statusChanges.length}</b> کلید هوش مصنوعی تغییر یافته است:\n\n` +
+    lines +
+    `\n\n💡 <i>می‌توانید کلیدهای منقضی را از بخش تنظیمات ربات یا مینی‌اپ به‌روزرسانی فرمایید.</i>`;
+
+  return {
+    changed: true,
+    totalKeys: keys.length,
+    changes: statusChanges,
+    report,
+  };
+}
+

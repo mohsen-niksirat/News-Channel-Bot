@@ -1,11 +1,34 @@
-import { db } from 'sdk';
+import { api, db } from 'sdk';
 import { users } from 'schema';
 import { runScanForUser } from 'lib/scanner';
 import { isInsideScheduleWindow } from 'lib/schedule';
 import { shouldPublishDailyDigestNow, sendDailyDigestForUser } from 'lib/digest';
+import { runNightlyKeyHealthCheck } from 'lib/health_check';
 
 export default async function (input, ctx) {
   console.log('cron: started with input', JSON.stringify(input));
+  if (input?.mode === 'nightly_health' || input?.mode === 'health_check') {
+    const targetUserId = input?.userId ? parseInt(input.userId, 10) : null;
+    const allUsers = await db.select().from(users).all();
+    const candidateUsers = allUsers.filter((u) => !targetUserId || u.tgId === targetUserId);
+    const results = [];
+    for (const u of candidateUsers) {
+      try {
+        const checkRes = await runNightlyKeyHealthCheck(u.tgId);
+        if (checkRes.changed && checkRes.report) {
+          await api.sendMessage({
+            chat_id: u.tgId,
+            text: checkRes.report,
+            parse_mode: 'HTML',
+          }).catch((err) => console.warn(`cron: failed to send health alert to ${u.tgId}:`, err.message));
+        }
+        results.push({ tgId: u.tgId, changed: checkRes.changed, totalKeys: checkRes.totalKeys });
+      } catch (err) {
+        results.push({ tgId: u.tgId, error: err.message });
+      }
+    }
+    return { ok: true, mode: 'nightly_health', results };
+  }
   if (input?.mode === 'digest') {
     const targetUserId = input?.userId ? parseInt(input.userId, 10) : null;
     const allUsers = await db.select().from(users).all();
