@@ -312,10 +312,43 @@ export async function harvestRssFeed(feedUrl, sourceName = 'RSS', maxItems = 2) 
       if (!title || !link) continue;
 
       let imageUrl = null;
-      const encMatch = chunk.match(/<enclosure[^>]+url=["']([^"']+)["'][^>]*type=["']image/i) ||
-                       chunk.match(/<media:content[^>]+url=["']([^"']+)["'][^>]*medium=["']image/i);
-      if (encMatch) {
+      // 1. <enclosure>
+      const encMatch = chunk.match(/<enclosure[^>]+url=["']([^"']+)["'][^>]*>/i);
+      if (encMatch && (encMatch[0].includes('image') || /\.(?:jpg|jpeg|png|webp)/i.test(encMatch[1]))) {
         imageUrl = encMatch[1];
+      }
+
+      // 2. <media:content>
+      if (!imageUrl) {
+        const mediaMatch = chunk.match(/<media:content[^>]+url=["']([^"']+)["'][^>]*>/i);
+        if (mediaMatch && (mediaMatch[0].includes('image') || /\.(?:jpg|jpeg|png|webp)/i.test(mediaMatch[1]))) {
+          imageUrl = mediaMatch[1];
+        }
+      }
+
+      // 3. <media:thumbnail>
+      if (!imageUrl) {
+        const thumbMatch = chunk.match(/<media:thumbnail[^>]+url=["']([^"']+)["'][^>]*>/i);
+        if (thumbMatch) {
+          imageUrl = thumbMatch[1];
+        }
+      }
+
+      // 4. <img> tag in description or content:encoded
+      if (!imageUrl) {
+        const imgMatch = chunk.match(/<img[^>]+src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i);
+        if (imgMatch) {
+          imageUrl = imgMatch[1];
+        }
+      }
+
+      // 5. Clean & validate image URL
+      if (imageUrl) {
+        imageUrl = imageUrl.replace(/&amp;/g, '&').trim();
+        if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl;
+        if (!isValidNewsImageUrl(imageUrl)) {
+          imageUrl = null;
+        }
       }
 
       const hash = hashString(`${link}_${title}`);

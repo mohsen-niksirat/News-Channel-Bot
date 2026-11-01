@@ -163,7 +163,7 @@ export async function sendRichPostSafe({
   postHtml,
   imageUrl = null,
   buttons = null,
-  disableWebPagePreview = false,
+  disableWebPagePreview = true,
 }) {
   let safeImageUrl = (imageUrl && isValidNewsImageUrl(imageUrl)) ? String(imageUrl).trim() : null;
   if (safeImageUrl && safeImageUrl.startsWith('//')) {
@@ -177,9 +177,8 @@ export async function sendRichPostSafe({
     safeContent = safeContent.slice(0, maxLen - 15) + '...';
   }
 
-  const linkPreviewOpt = disableWebPagePreview
-    ? { is_disabled: true }
-    : { is_disabled: false, prefer_large_media: true, show_above_text: false };
+  // Strictly disable web link previews so images never show as preview cards
+  const linkPreviewOpt = { is_disabled: true };
 
   // Attempt 1: Full Rich HTML
   try {
@@ -197,7 +196,7 @@ export async function sendRichPostSafe({
         text: safeContent,
         parse_mode: 'HTML',
         reply_markup: buttons || undefined,
-        disable_web_page_preview: disableWebPagePreview,
+        disable_web_page_preview: true,
         link_preview_options: linkPreviewOpt,
       });
     }
@@ -227,14 +226,14 @@ export async function sendRichPostSafe({
           text: basicHtml,
           parse_mode: 'HTML',
           reply_markup: retryButtons || undefined,
-          disable_web_page_preview: disableWebPagePreview,
+          disable_web_page_preview: true,
           link_preview_options: linkPreviewOpt,
         });
       }
     } catch (err2) {
-      console.warn(`sendRichPostSafe: Second attempt failed (${err2.message}), retrying with plain text / web preview...`);
+      console.warn(`sendRichPostSafe: Second attempt failed (${err2.message}), retrying with plain text...`);
 
-      // Attempt 3: If photo upload failed repeatedly (e.g. invalid photo format), send text with link preview enabled
+      // Attempt 3: Plain text without HTML tags and NO link preview
       const plain = stripAllHtml(safeContent);
       if (isPhoto) {
         try {
@@ -250,8 +249,8 @@ export async function sendRichPostSafe({
         chat_id: chatId,
         text: plain,
         reply_markup: undefined,
-        disable_web_page_preview: false,
-        link_preview_options: { is_disabled: false, prefer_large_media: true, show_above_text: false },
+        disable_web_page_preview: true,
+        link_preview_options: linkPreviewOpt,
       });
     }
   }
