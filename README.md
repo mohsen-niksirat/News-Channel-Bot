@@ -49,12 +49,16 @@
 5. **🗞️ بولتن تجمیعی هوشمند ضد اسپم (Anti-Spam Hourly Bulletin):**
    - پایش هوشمند دوره‌ای: اگر در یک بازه ۱ یا ۲ خبر جدید باشد، به صورت پست‌های مستقل و تحلیلی منتشر می‌شوند.
    - در صورت وجود **۳ خبر یا بیشتر**، همه در قالب یک **بولتن خبری ساعتی واحد** همراه با تیترهای جذاب، خلاصه روان و لینک اختصاصی هر منبع تجمیع می‌شوند تا کانال شلوغ نشود.
-6. **📊 داشبورد تحلیل توکن‌ها و هزینه‌ها (`/tokens`):**
-   - گزارش دقیق مصرف توکن به تفکیک امروز، ۷ روز اخیر، ماهانه، کل دوره و بر حسب پروایدرها.
-7. **📨 خلاصه‌ساز پیام‌های پی‌وی و فورواردی:**
+6. **📊 داشبورد تحلیل توکن‌ها و شفافیت هزینه‌ها (`/tokens`):**
+   - گزارش دقیق مصرف توکن به تفکیک امروز، ۷ روز اخیر، ماهانه، کل دوره و بر حسب پروایدرها به همراه تخمین دلاری هزینه بر اساس تعرفه رسمی هر ۱ میلیون توکن.
+7. **⏱️ زمان‌بندی ساعات انتشار و روزنامه صبحگاهی (`/schedule` و `/newspaper`):**
+   - تعریف پنجره‌های زمانی انتشار در طول روز، دسته‌بندی موضوعی منابع و انتشار خودکار روزنامه گزیده اخبار ۲۴ ساعت گذشته.
+8. **🔒 حریم خصوصی و حذف کامل حساب کاربری (`/delete`):**
+   - امکان پاک‌سازی ۱۰۰٪ و بی‌بازگشت تمامی اطلاعات کاربر، کلیدها، منابع، پست‌ها و آمار توکن‌ها با تایید دومرحله‌ای.
+9. **📨 خلاصه‌ساز پیام‌های پی‌وی و فورواردی:**
    - امکان فوروارد کردن هر پیام، متن یا خبر طولانی از چت‌ها یا کانال‌ها به ربات جهت تبدیل فوری به پست کانال.
-8. **📑 صف بررسی پیش‌نویس‌ها و انتشار مستقیم:**
-   - قابلیت فعال‌سازی انتشار خودکار (Auto-Publish) یا بررسی دستی با دکمه‌های ✅ انتشار، 🔁 بازنویسی و ❌ رد.
+10. **📑 صف بررسی پیش‌نویس‌ها و انتشار مستقیم:**
+    - قابلیت فعال‌سازی انتشار خودکار (Auto-Publish) یا بررسی دستی با دکمه‌های ✅ انتشار، 🔁 بازنویسی و ❌ رد.
 
 ---
 
@@ -157,10 +161,11 @@ npx tgcloud push
   - *Round-Robin:* Distributes workload evenly to maximize rate-limits.
   - *Smart Router:* Health-aware key selection minimizing latency and 429 errors.
   - *Advanced Fusion:* High-fidelity journalistic style.
-- **🔐 Multi-Tenant Key Privacy:** Strict tenant isolation with priority up/down reordering (`⬆️`/`⬇️`).
-- **🧪 Key Health & Model Inspector (`/testkeys`):** Live ping latency test + automated discovery of free & high-throughput models.
+- **🔐 Multi-Tenant Key Privacy & GDPR-grade Wipe (`/delete`):** Strict tenant isolation with priority up/down reordering (`⬆️`/`⬇️`) and a full two-step account deletion command removing all keys, sources, posts, and token records.
+- **🧪 Key Health & Model Inspector (`/testkeys` & Nightly Ping):** Live latency test + automated nightly ping to detect dead or cooldown keys without alert spam.
 - **🗞️ Anti-Spam Hourly Bulletin Aggregator:** Automatically bundles 3+ news items into a single editorial digest with clickable hyperlinks `<a href="...">` to preserve channel readability.
-- **📊 Real-time Token Analytics (`/tokens`):** Track token consumption by day, week, month, key, and provider.
+- **⏱️ Schedule Windows & Daily Newspaper (`/schedule` & `/newspaper`):** Publish posts within designated daily windows (Tehran Time) and receive a 24-hour morning newspaper digest.
+- **📊 Real-time Token Analytics & Cost Transparency (`/tokens`):** Track token consumption by day, week, month, key, and provider, with live USD cost calculations based on official rates per 1M tokens.
 - **📨 On-Demand Forward Summarizer:** Forward any long article, tweet, or message to turn it into an engaging Telegram post.
 
 ---
@@ -173,11 +178,13 @@ npx tgcloud push
 | `/scan` | 🔍 Trigger an immediate news scan and AI analysis |
 | `/review` | 📑 Open the draft review queue |
 | `/newspaper` | 🗞️ Generate a custom newspaper edition |
+| `/schedule` | ⏱️ Configure automated publishing time windows |
 | `/sources` | 📡 Manage RSS feeds and Telegram sources |
 | `/ai` | 🤖 AI key pool, routing policies & custom providers |
 | `/testkeys` | 🧪 Live key health check & active model discovery |
-| `/tokens` | 📊 Token usage and cost analytics dashboard |
+| `/tokens` | 📊 Token usage and cost transparency dashboard |
 | `/channel` | 📢 Channel setup and auto-publishing toggle |
+| `/delete` | 🗑️ Full account wipe & data deletion |
 | `/cancel` | ❌ Cancel current state and return to main menu |
 
 ---
