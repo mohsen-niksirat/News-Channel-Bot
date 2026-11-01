@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseJinaTelegramMarkdown, hashString, cleanText, harvestRssFeed, isValidNewsImageUrl } from 'lib/harvester';
+import { parseJinaTelegramMarkdown, hashString, cleanText, harvestRssFeed, isValidNewsImageUrl, extractArticleOgImage } from 'lib/harvester';
+import { normalizeSafeImageUrl } from 'lib/rich_post';
 import { setMockFetch } from 'sdk';
 
 test('hashString stability: produces consistent and deterministic hex hashes', () => {
@@ -85,4 +86,33 @@ test('isValidNewsImageUrl: strictly rejects Telegram emojis, avatars, favicons a
   assert.equal(isValidNewsImageUrl('https://cdn4.telesco.pe/file/ABCDEF1234567890.jpg'), true);
   assert.equal(isValidNewsImageUrl('https://zoomit.ir/media/2026/10/nokia_phone_banner.webp'), true);
   assert.equal(isValidNewsImageUrl('https://techcrunch.com/wp-content/uploads/2026/10/datacenter.jpg'), true);
+});
+
+test('normalizeSafeImageUrl: converts telesco.pe URLs to wsrv.nl proxy and leaves other genuine images intact', () => {
+  const telescoUrl = 'https://cdn4.telesco.pe/file/ABCDEF1234567890.jpg';
+  const normalized = normalizeSafeImageUrl(telescoUrl);
+  assert.equal(normalized.startsWith('https://wsrv.nl/?url='), true);
+  assert.equal(normalized.includes(encodeURIComponent(telescoUrl)), true);
+  assert.equal(normalized.endsWith('&output=jpg'), true);
+
+  const regularUrl = 'https://techcrunch.com/uploads/photo.jpg';
+  assert.equal(normalizeSafeImageUrl(regularUrl), regularUrl);
+
+  assert.equal(normalizeSafeImageUrl('https://telegram.org/img/emoji/40/1f53b.png'), null);
+});
+
+test('extractArticleOgImage: extracts og:image from HTML page', async () => {
+  setMockFetch(async (url) => {
+    return {
+      ok: true,
+      status: 200,
+      async text() {
+        return '<html><head><meta property="og:image" content="https://techcrunch.com/image.jpg" /></head></html>';
+      },
+    };
+  });
+
+  const img = await extractArticleOgImage('https://techcrunch.com/article-1');
+  setMockFetch(null);
+  assert.equal(img, 'https://techcrunch.com/image.jpg');
 });

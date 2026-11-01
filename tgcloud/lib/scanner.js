@@ -19,7 +19,7 @@ import {
   saveDraftPost,
   markPostPublished,
 } from 'lib/db';
-import { harvestTelegramChannel, harvestRssFeed } from 'lib/harvester';
+import { harvestTelegramChannel, harvestRssFeed, extractArticleOgImage } from 'lib/harvester';
 import { generateNewsRewrite } from 'lib/ai_router';
 import { buildEditorialPost, buildBulletinPost, buildPostButtons, sendRichPostSafe, preparePostForPublishing, escHtml } from 'lib/rich_post';
 import { mainMenuKeyboard, reviewPostKeyboard } from 'lib/keyboards';
@@ -32,6 +32,10 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
 
   const draftOnly = Boolean(options?.draftOnly);
   const notifyChat = chatId || userId;
+  const maxSourcesLimit = options?.maxSources || 8;
+  const maxItemsLimit = options?.maxItems || 5;
+
+  let loadingMsgId = null;
 
   // Check if user has added at least one AI key
   const userKeys = await getAiKeys(userId);
@@ -48,12 +52,37 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
   }
 
   if (chatId) {
-    await api.sendMessage({
+    const sent = await api.sendMessage({
       chat_id: notifyChat,
       text: '⏳ <b>در حال پایش منابع خبری با هوش مصنوعی...</b>\nلطفاً چند ثانیه شکیبا باشید.',
       parse_mode: 'HTML',
-    }).catch(() => {});
+    }).catch(() => null);
+    if (sent?.message_id) {
+      loadingMsgId = sent.message_id;
+    }
   }
+
+  const updateNotifyStatus = async (text, keyboard = null) => {
+    if (!chatId) return;
+    if (loadingMsgId) {
+      try {
+        await api.editMessageText({
+          chat_id: notifyChat,
+          message_id: loadingMsgId,
+          text,
+          parse_mode: 'HTML',
+          reply_markup: keyboard || undefined,
+        });
+        return;
+      } catch {}
+    }
+    await api.sendMessage({
+      chat_id: notifyChat,
+      text,
+      parse_mode: 'HTML',
+      reply_markup: keyboard || undefined,
+    }).catch(() => {});
+  };
 
   const sourcesList = await getUserSources(userId);
   const activeSources = sourcesList.filter((s) => s.enabled);
@@ -69,8 +98,8 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
     if (i < rssSources.length) balancedSources.push(rssSources[i]);
   }
 
-  // Fetch sources in parallel (top 6-8 sources) to stay well under cloud execution timeout
-  const sourcesToScan = balancedSources.slice(0, 8);
+  // Fetch sources in parallel (bounded concurrency) to stay well under cloud execution timeout
+  const sourcesToScan = balancedSources.slice(0, maxSourcesLimit);
   const harvestPromises = sourcesToScan.map(async (src) => {
     try {
       let harvested = [];
@@ -90,9 +119,9 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
   const candidateItems = [];
 
   for (const { src, items } of harvestResults) {
-    if (candidateItems.length >= 5) break;
+    if (candidateItems.length >= maxItemsLimit) break;
     for (const item of items) {
-      if (candidateItems.length >= 5) break;
+      if (candidateItems.length >= maxItemsLimit) break;
       const exists = await isPostAlreadyHarvested(userId, item.hash);
       if (!exists && !candidateItems.some((c) => c.hash === item.hash)) {
         candidateItems.push({
@@ -104,15 +133,21 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
     }
   }
 
-  if (candidateItems.length === 0) {
-    if (chatId) {
-      await api.sendMessage({
-        chat_id: notifyChat,
-        text: '✨ <b>پایش تکمیل شد.</b> خبر جدیدی نسبت به آخرین اسکن یافت نشد.',
-        parse_mode: 'HTML',
-        reply_markup: mainMenuKeyboard(user),
-      });
+  // For candidate items without images (e.g. RSS articles like TechCrunch), extract high-res og:image
+  for (const item of candidateItems) {
+    if (!item.imageUrl && item.url && !item.url.includes('t.me')) {
+      const ogImg = await extractArticleOgImage(item.url);
+      if (ogImg) {
+        item.imageUrl = ogImg;
+      }
     }
+  }
+
+  if (candidateItems.length === 0) {
+    await updateNotifyStatus(
+      '✨ <b>پایش تکمیل شد.</b> خبر جدیدی نسبت به آخرین اسکن یافت نشد.',
+      mainMenuKeyboard(user)
+    );
     return;
   }
 
@@ -218,7 +253,7 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
             postHtml: formattedHtml,
             imageUrl: item.imageUrl,
             buttons: null,
-            disableWebPagePreview: false,
+            disableWebPagePreview: true,
           });
           if (sent && sent.message_id) {
             await markPostPublished(saved.id, sent.message_id);
@@ -232,20 +267,16 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
     if (chatId) {
       const canAutoPublish = user.autoPublish && user.channelId && !draftOnly;
       if (canAutoPublish) {
-        await api.sendMessage({
-          chat_id: notifyChat,
-          text: `🚀 <b>پایش ساعتی تکمیل شد!</b> تعداد <b>${publishedCount}</b> خبر به طور مستقیم در کانال <code>${escHtml(user.channelId)}</code> منتشر شد.`,
-          parse_mode: 'HTML',
-          reply_markup: mainMenuKeyboard(user),
-        });
+        await updateNotifyStatus(
+          `🚀 <b>پایش ساعتی تکمیل شد!</b> تعداد <b>${publishedCount}</b> خبر به طور مستقیم در کانال <code>${escHtml(user.channelId)}</code> منتشر شد.`,
+          mainMenuKeyboard(user)
+        );
       } else {
         const reason = draftOnly ? ' (حالت زمان‌بندی انتشار)' : '';
-        await api.sendMessage({
-          chat_id: notifyChat,
-          text: `📨 <b>پایش ساعتی تکمیل شد!</b> تعداد <b>${publishedCount}</b> خبر جدید آماده و به صف پیش‌نویس اضافه شد${reason}.\n\n👇 برای مشاهده و انتشار: /review`,
-          parse_mode: 'HTML',
-          reply_markup: reviewPostKeyboard(0),
-        });
+        await updateNotifyStatus(
+          `📨 <b>پایش ساعتی تکمیل شد!</b> تعداد <b>${publishedCount}</b> خبر جدید آماده و به صف پیش‌نویس اضافه شد${reason}.\n\n👇 برای مشاهده و انتشار: /review`,
+          reviewPostKeyboard(0)
+        );
       }
     }
     return;
@@ -375,20 +406,16 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
 
   if (chatId) {
     if (canAutoPublish) {
-      await api.sendMessage({
-        chat_id: notifyChat,
-        text: `🗞️ <b>بولتن خبری ساعتی منتشر شد!</b>\nتعداد <b>${processedItems.length}</b> خبر در قالب یک پست تجمیعی واحد در کانال <code>${escHtml(user.channelId)}</code> منتشر شد.`,
-        parse_mode: 'HTML',
-        reply_markup: mainMenuKeyboard(user),
-      });
+      await updateNotifyStatus(
+        `🗞️ <b>بولتن خبری ساعتی منتشر شد!</b>\nتعداد <b>${processedItems.length}</b> خبر در قالب یک پست تجمیعی واحد در کانال <code>${escHtml(user.channelId)}</code> منتشر شد.`,
+        mainMenuKeyboard(user)
+      );
     } else {
       const reason = draftOnly ? ' (حالت زمان‌بندی انتشار)' : '';
-      await api.sendMessage({
-        chat_id: notifyChat,
-        text: `🗞️ <b>بولتن ساعتی در انتظار تایید (${processedItems.length} خبر)${reason}:</b>\n\n${bulletinHtml}`,
-        parse_mode: 'HTML',
-        reply_markup: reviewPostKeyboard(savedPostIds[0] || 0),
-      });
+      await updateNotifyStatus(
+        `🗞️ <b>بولتن ساعتی در انتظار تایید (${processedItems.length} خبر)${reason}:</b>\n\n${bulletinHtml}`,
+        reviewPostKeyboard(savedPostIds[0] || 0)
+      );
     }
   }
 }

@@ -369,3 +369,36 @@ export async function harvestRssFeed(feedUrl, sourceName = 'RSS', maxItems = 2) 
     return [];
   }
 }
+
+/**
+ * Extracts OpenGraph image (og:image) from a news article URL.
+ * Used when RSS feeds omit <enclosure> or media tags (e.g. TechCrunch, WordPress).
+ */
+export async function extractArticleOgImage(articleUrl, customCache = globalJinaCache) {
+  if (!articleUrl || typeof articleUrl !== 'string' || !articleUrl.startsWith('http')) return null;
+  try {
+    const html = await cachedFetchText(articleUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+    }, fetch, customCache).catch(() => null);
+
+    if (!html || typeof html !== 'string') return null;
+
+    const m = html.match(/property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+              html.match(/content=["']([^"']+)["']\s+property=["']og:image["']/i) ||
+              html.match(/name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
+
+    if (m && m[1]) {
+      let imgUrl = m[1].replace(/&amp;/g, '&').trim();
+      if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+      if (isValidNewsImageUrl(imgUrl)) {
+        return imgUrl;
+      }
+    }
+  } catch (err) {
+    console.warn(`Failed to extract og:image from ${articleUrl}:`, err.message);
+  }
+  return null;
+}

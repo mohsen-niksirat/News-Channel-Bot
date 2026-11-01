@@ -62,14 +62,15 @@ export default async function (input, ctx) {
       const batchPromises = batch.map(async (u) => {
         console.log('cron: checking user', u.tgId, 'channel:', u.channelId, 'autoPublish:', u.autoPublish, 'scheduleWindows:', u.scheduleWindows);
 
-        // Schedule window calculation (Asia/Tehran)
-        const insideWindow = isInsideScheduleWindow(u.scheduleWindows);
+        // Schedule window calculation (Asia/Tehran) with 20-min tolerance
+        // (Allows cron running at :15 and :45 to reliably match all on-the-hour windows)
+        const insideWindow = isInsideScheduleWindow(u.scheduleWindows, new Date(), 20);
         const draftOnly = !insideWindow;
 
         if (u.channelId && (u.autoPublish || u.scheduleWindows)) {
           try {
             console.log(`cron: calling runScanForUser for ${u.tgId} (insideWindow=${insideWindow}, draftOnly=${draftOnly})`);
-            await runScanForUser(u.tgId, null, { draftOnly });
+            await runScanForUser(u.tgId, null, { draftOnly, maxSources: 4, maxItems: 2 });
             console.log('cron: finished runScanForUser for', u.tgId);
             return {
               tgId: u.tgId,

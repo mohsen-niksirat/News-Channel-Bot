@@ -155,6 +155,23 @@ export function buildPostButtons({ sourceUrl, sourceName, summaryToCopy, channel
 }
 
 /**
+ * Normalizes and secures image URLs for Telegram Bot API delivery.
+ * Telegram Bot API download servers refuse direct downloads from telesco.pe CDN ('failed to get HTTP URL content').
+ * Routing telesco.pe URLs through wsrv.nl image proxy delivers clean, optimized JPEGs reliably.
+ */
+export function normalizeSafeImageUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  let clean = url.trim();
+  if (clean.startsWith('//')) clean = 'https:' + clean;
+  if (!isValidNewsImageUrl(clean)) return null;
+
+  if (clean.includes('telesco.pe')) {
+    return `https://wsrv.nl/?url=${encodeURIComponent(clean)}&output=jpg`;
+  }
+  return clean;
+}
+
+/**
  * Fail-Safe publisher to channel or private chat.
  * Retries with simplified markup if Telegram rejects advanced tags.
  */
@@ -165,12 +182,9 @@ export async function sendRichPostSafe({
   buttons = null,
   disableWebPagePreview = true,
 }) {
-  let safeImageUrl = (imageUrl && isValidNewsImageUrl(imageUrl)) ? String(imageUrl).trim() : null;
-  if (safeImageUrl && safeImageUrl.startsWith('//')) {
-    safeImageUrl = 'https:' + safeImageUrl;
-  }
+  let safeImageUrl = normalizeSafeImageUrl(imageUrl);
   const isPhoto = Boolean(safeImageUrl);
-  const maxLen = isPhoto ? 1020 : 4090;
+  const maxLen = isPhoto ? 1000 : 4090;
 
   let safeContent = postHtml;
   if (safeContent.length > maxLen) {
@@ -240,14 +254,16 @@ export async function sendRichPostSafe({
           return await api.sendPhoto({
             chat_id: chatId,
             photo: safeImageUrl,
-            caption: plain,
+            caption: plain.slice(0, 1020),
             reply_markup: undefined,
           });
-        } catch {}
+        } catch (photoErr) {
+          console.warn(`sendRichPostSafe: Plain photo attempt failed (${photoErr.message}), falling back to text`);
+        }
       }
       return await api.sendMessage({
         chat_id: chatId,
-        text: plain,
+        text: plain.slice(0, 4090),
         reply_markup: undefined,
         disable_web_page_preview: true,
         link_preview_options: linkPreviewOpt,
