@@ -8,6 +8,8 @@ import apiHandler, {
   setBotTokenForTests,
   computeSignedToken,
 } from '../tgcloud/endpoints/api.js';
+import addSourcesHandler from '../tgcloud/endpoints/add_sources.js';
+import { ADMIN_ID } from '../tgcloud/lib/db.js';
 import { hashString } from '../tgcloud/lib/harvester.js';
 
 const TEST_BOT_TOKEN = '123456789:ABCdefGHIjklMNOpqrsTUVwxyz_TEST_TOKEN';
@@ -251,4 +253,54 @@ test('api.js: action draft/action handles publish, reject, and edit with auth ga
 
   const rejectedPost = await db.select().from(posts).where((p) => p.id === 202).get();
   assert.strictEqual(rejectedPost.status, 'rejected');
+});
+
+test('add_sources.js: requires authentication and restricts access strictly to admin', async () => {
+  resetMockDb();
+  setBotTokenForTests(TEST_BOT_TOKEN);
+
+  // 1. Unauthenticated request -> 401 unauthorized
+  const unauthRes = await addSourcesHandler({}, {});
+  assert.strictEqual(unauthRes.ok, false);
+  assert.strictEqual(unauthRes.status, 401);
+  assert.strictEqual(unauthRes.error, 'unauthorized');
+
+  // 2. Authenticated non-admin request -> 403 forbidden
+  const nonAdminUid = 999111222;
+  const nonAdminToken = computeSignedToken(nonAdminUid, TEST_BOT_TOKEN);
+  const nonAdminRes = await addSourcesHandler({ token: nonAdminToken }, {});
+  assert.strictEqual(nonAdminRes.ok, false);
+  assert.strictEqual(nonAdminRes.status, 403);
+  assert.strictEqual(nonAdminRes.error, 'forbidden');
+
+  // 3. Authenticated admin request -> succeeds
+  const adminToken = computeSignedToken(ADMIN_ID, TEST_BOT_TOKEN);
+  // Ensure admin user exists in stub db
+  await db.insert(users).values({
+    id: 99,
+    tgId: ADMIN_ID,
+    name: 'AdminUser',
+    channelId: '@admin_channel',
+  }).run();
+
+  const customSources = [
+    {
+      name: 'Custom Test Tech',
+      type: 'rss',
+      urlOrHandle: 'https://example.com/rss',
+      lang: 'en',
+      category: 'tech',
+    },
+  ];
+
+  const adminRes = await addSourcesHandler({ token: adminToken, sources: customSources }, {});
+  assert.strictEqual(adminRes.ok, true);
+  assert.strictEqual(adminRes.count, 1);
+  assert.strictEqual(adminRes.results[0].ok, true);
+  assert.strictEqual(adminRes.results[0].name, 'Custom Test Tech');
+
+  // Verify in db
+  const insertedSources = await db.select().from(sources).where((s) => s.userId === 99).all();
+  assert.strictEqual(insertedSources.length, 1);
+  assert.strictEqual(insertedSources[0].name, 'Custom Test Tech');
 });

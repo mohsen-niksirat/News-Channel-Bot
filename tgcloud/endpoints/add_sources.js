@@ -1,5 +1,5 @@
-import { db } from 'sdk';
-import { addSource, getUser } from 'lib/db';
+import { addSource, ADMIN_ID } from 'lib/db';
+import { validateApiAuth } from 'endpoints/api';
 
 const NEW_SOURCES = [
   {
@@ -67,8 +67,23 @@ const NEW_SOURCES = [
   }
 ];
 
+/**
+ * Endpoint for seeding or batch adding news sources.
+ * Requires authentication via Telegram initData or HMAC signed token.
+ * Restricted strictly to the system administrator. Non-admin authenticated
+ * callers receive { ok: false, status: 403, error: 'forbidden' }.
+ */
 export default async function (input, ctx) {
-  const userId = input?.userId || 65807806;
+  const auth = validateApiAuth(input, ctx);
+  if (!auth.authenticated) {
+    return { ok: false, status: 401, error: 'unauthorized' };
+  }
+
+  const userId = auth.userId;
+  if (userId !== ADMIN_ID) {
+    return { ok: false, status: 403, error: 'forbidden' };
+  }
+
   const sourcesToAdd = (input?.sources && input.sources.length > 0) ? input.sources : NEW_SOURCES;
   const results = [];
 
