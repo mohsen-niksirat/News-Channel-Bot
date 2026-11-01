@@ -138,9 +138,18 @@ export function parseTelegramWebHtml(html, cleanHandle) {
     if (!plain || plain.length < 20) continue;
 
     let imageUrl = null;
-    const imgMatch = chunk.match(/background-image:\s*url\('([^']+)'\)/);
+    const imgMatch = chunk.match(/background-image:\s*url\(['"]?([^'")]+)['"]?\)/i) || chunk.match(/<img[^>]+src=["']([^"']+)["']/i);
     if (imgMatch) {
-      imageUrl = imgMatch[1];
+      imageUrl = imgMatch[1].trim();
+      if (imageUrl.startsWith('//')) {
+        imageUrl = 'https:' + imageUrl;
+      }
+      if (imageUrl.includes('googleusercontent.com') || imageUrl.includes('translate.google')) {
+        const uMatch = imageUrl.match(/[?&]u=([^&]+)/);
+        if (uMatch) {
+          try { imageUrl = decodeURIComponent(uMatch[1]); } catch {}
+        }
+      }
     }
 
     const dateMatch = chunk.match(/datetime="([^"]+)"/);

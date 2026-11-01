@@ -289,7 +289,7 @@ export default async function (query) {
       postHtml: postHtml,
       imageUrl: post.imageUrl,
       buttons: null,
-      disableWebPagePreview: true,
+      disableWebPagePreview: false,
     });
 
     if (sent && sent.message_id) {

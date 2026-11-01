@@ -241,7 +241,7 @@ export default async function (input, ctx) {
         postHtml,
         imageUrl: post.imageUrl,
         buttons: null,
-        disableWebPagePreview: true,
+        disableWebPagePreview: false,
       });
 
       if (sent && sent.message_id) {
@@ -452,7 +452,7 @@ export default async function (input, ctx) {
       postHtml,
       imageUrl: post.imageUrl,
       buttons: null,
-      disableWebPagePreview: true,
+      disableWebPagePreview: false,
     });
 
     if (sent && sent.message_id) {

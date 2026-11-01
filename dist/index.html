@@ -105,6 +105,13 @@
     <div class="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
     <div class="text-xs text-slate-300 font-bold">در حال بارگذاری اطلاعات زنده از تلگرام کلود...</div>
   </div>
+  <script>
+    // Safeguard: Automatically dismiss loading overlay after 1.5s in all environments
+    setTimeout(function () {
+      var ov = document.getElementById('loadingOverlay');
+      if (ov) ov.style.display = 'none';
+    }, 1500);
+  </script>
 
   <!-- Main Scrollable Content Area -->
   <main class="flex-1 overflow-y-auto custom-scroll p-4 space-y-4 pb-24">
@@ -767,8 +774,8 @@
         }
       } catch (e) {}
 
-      // If not cached yet and user is Mohsen, apply baseline immediately
-      if (!hasHydrated && currentUserId === 65807806) {
+      // Fallback: If not cached yet, apply baseline immediately so UI never hangs
+      if (!hasHydrated) {
         applyServerData(MOHSEN_BASELINE);
         hasHydrated = true;
       }

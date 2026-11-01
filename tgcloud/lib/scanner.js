@@ -218,7 +218,7 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
             postHtml: formattedHtml,
             imageUrl: item.imageUrl,
             buttons: null,
-            disableWebPagePreview: true,
+            disableWebPagePreview: false,
           });
           if (sent && sent.message_id) {
             await markPostPublished(saved.id, sent.message_id);

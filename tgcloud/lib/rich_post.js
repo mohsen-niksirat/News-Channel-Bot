@@ -164,8 +164,11 @@ export async function sendRichPostSafe({
   buttons = null,
   disableWebPagePreview = false,
 }) {
-  // Telegram caption limit is 1024 chars for photos, message text is 4096 chars
-  const isPhoto = Boolean(imageUrl);
+  let safeImageUrl = imageUrl ? String(imageUrl).trim() : null;
+  if (safeImageUrl && safeImageUrl.startsWith('//')) {
+    safeImageUrl = 'https:' + safeImageUrl;
+  }
+  const isPhoto = Boolean(safeImageUrl);
   const maxLen = isPhoto ? 1020 : 4090;
 
   let safeContent = postHtml;
@@ -173,14 +176,16 @@ export async function sendRichPostSafe({
     safeContent = safeContent.slice(0, maxLen - 15) + '...';
   }
 
-  const linkPreviewOpt = disableWebPagePreview ? { is_disabled: true } : undefined;
+  const linkPreviewOpt = disableWebPagePreview
+    ? { is_disabled: true }
+    : { is_disabled: false, prefer_large_media: true, show_above_text: false };
 
   // Attempt 1: Full Rich HTML
   try {
     if (isPhoto) {
       return await api.sendPhoto({
         chat_id: chatId,
-        photo: imageUrl,
+        photo: safeImageUrl,
         caption: safeContent,
         parse_mode: 'HTML',
         reply_markup: buttons || undefined,
@@ -210,7 +215,7 @@ export async function sendRichPostSafe({
       if (isPhoto) {
         return await api.sendPhoto({
           chat_id: chatId,
-          photo: imageUrl,
+          photo: safeImageUrl,
           caption: basicHtml,
           parse_mode: 'HTML',
           reply_markup: retryButtons || undefined,
@@ -226,15 +231,15 @@ export async function sendRichPostSafe({
         });
       }
     } catch (err2) {
-      console.warn(`sendRichPostSafe: Second attempt failed (${err2.message}), retrying with plain text...`);
+      console.warn(`sendRichPostSafe: Second attempt failed (${err2.message}), retrying with plain text / web preview...`);
 
-      // Attempt 3: Plain text guaranteed delivery without buttons
+      // Attempt 3: If photo upload failed repeatedly (e.g. invalid photo format), send text with link preview enabled
       const plain = stripAllHtml(safeContent);
       if (isPhoto) {
         try {
           return await api.sendPhoto({
             chat_id: chatId,
-            photo: imageUrl,
+            photo: safeImageUrl,
             caption: plain,
             reply_markup: undefined,
           });
@@ -244,8 +249,8 @@ export async function sendRichPostSafe({
         chat_id: chatId,
         text: plain,
         reply_markup: undefined,
-        disable_web_page_preview: disableWebPagePreview,
-        link_preview_options: linkPreviewOpt,
+        disable_web_page_preview: false,
+        link_preview_options: { is_disabled: false, prefer_large_media: true, show_above_text: false },
       });
     }
   }
