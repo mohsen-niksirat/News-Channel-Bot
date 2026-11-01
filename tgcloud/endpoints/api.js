@@ -176,6 +176,8 @@ export default async function (input, ctx) {
       draftsCount: drafts.length,
       publishedToday,
       tokensToday: tokenStats?.today?.total || 0,
+      costTodayFormatted: tokenStats?.cost?.todayFormatted || '$0.00',
+      costAllTimeFormatted: tokenStats?.cost?.allTimeFormatted || '$0.00',
       keysHealth,
       channelId: user.channelId || '',
       autoPublish: Boolean(user.autoPublish),

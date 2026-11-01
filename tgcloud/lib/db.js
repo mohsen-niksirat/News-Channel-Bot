@@ -1,6 +1,7 @@
 import { db } from 'sdk';
 import { eq, and, or, desc, asc, sql } from 'sdk/db';
 import { users, sources, customProviders, aiKeys, tokenUsage, posts } from 'schema';
+import { calculateTokenCost, formatCostUsd, PRICING_DISCLAIMER, PRICING_LAST_UPDATED } from 'lib/pricing';
 
 export const ADMIN_ID = 65807806; // Mohsen Niksirat
 
@@ -309,6 +310,19 @@ export async function getTokenUsageStats(userId) {
       month: 0,
       allTime: 0,
       byProvider: {},
+      providerCosts: {},
+      cost: {
+        today: 0,
+        todayFormatted: '$0.00',
+        week: 0,
+        weekFormatted: '$0.00',
+        month: 0,
+        monthFormatted: '$0.00',
+        allTime: 0,
+        allTimeFormatted: '$0.00',
+        disclaimer: PRICING_DISCLAIMER,
+        lastUpdated: PRICING_LAST_UPDATED,
+      },
     };
   }
   const u = await getUser(userId);
@@ -330,25 +344,44 @@ export async function getTokenUsageStats(userId) {
   let weekTokens = 0;
   let monthTokens = 0;
   let allTimeTokens = 0;
+
+  let todayCost = 0;
+  let weekCost = 0;
+  let monthCost = 0;
+  let allTimeCost = 0;
+
   const providerStats = {};
+  const providerCosts = {};
 
   for (const row of all) {
     const t = row.totalTokens || 0;
     const p = row.promptTokens || 0;
     const c = row.completionTokens || 0;
     const created = row.createdAt || 0;
+    const provRaw = (row.provider || 'gemini').toLowerCase();
+    const cost = calculateTokenCost(provRaw, p, c);
 
     allTimeTokens += t;
-    if (created >= monthAgo) monthTokens += t;
-    if (created >= weekAgo) weekTokens += t;
+    allTimeCost += cost;
+
+    if (created >= monthAgo) {
+      monthTokens += t;
+      monthCost += cost;
+    }
+    if (created >= weekAgo) {
+      weekTokens += t;
+      weekCost += cost;
+    }
     if (created >= dayStart) {
       todayTokens += t;
       todayPrompt += p;
       todayComp += c;
+      todayCost += cost;
     }
 
-    const prov = (row.provider || 'other').toUpperCase();
+    const prov = provRaw.toUpperCase();
     providerStats[prov] = (providerStats[prov] || 0) + t;
+    providerCosts[provRaw] = Number(((providerCosts[provRaw] || 0) + cost).toFixed(6));
   }
 
   return {
@@ -357,6 +390,19 @@ export async function getTokenUsageStats(userId) {
     month: monthTokens,
     allTime: allTimeTokens,
     byProvider: providerStats,
+    providerCosts,
+    cost: {
+      today: Number(todayCost.toFixed(6)),
+      todayFormatted: formatCostUsd(todayCost),
+      week: Number(weekCost.toFixed(6)),
+      weekFormatted: formatCostUsd(weekCost),
+      month: Number(monthCost.toFixed(6)),
+      monthFormatted: formatCostUsd(monthCost),
+      allTime: Number(allTimeCost.toFixed(6)),
+      allTimeFormatted: formatCostUsd(allTimeCost),
+      disclaimer: PRICING_DISCLAIMER,
+      lastUpdated: PRICING_LAST_UPDATED,
+    },
   };
 }
 
@@ -590,3 +636,36 @@ export function formatAdminStatsMessage(stats) {
     `🛡️ <i>دسترسی انحصاری شناسه مدیریت: <code>${ADMIN_ID}</code></i>`
   );
 }
+
+// ---------------- Full Account Data Wipe (/delete) ----------------
+export async function wipeUserData(userId) {
+  if (!userId) return false;
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
+  const tgId = u ? u.tgId : (typeof userId === 'number' ? userId : null);
+
+  // 1. Delete all sources
+  await db.delete(sources).where(or(eq(sources.userId, userId), eq(sources.userId, targetId))).run().catch(() => {});
+
+  // 2. Delete all custom providers
+  await db.delete(customProviders).where(or(eq(customProviders.userId, userId), eq(customProviders.userId, targetId))).run().catch(() => {});
+
+  // 3. Delete all ai keys
+  await db.delete(aiKeys).where(or(eq(aiKeys.userId, userId), eq(aiKeys.userId, targetId))).run().catch(() => {});
+
+  // 4. Delete all token usage records
+  await db.delete(tokenUsage).where(or(eq(tokenUsage.userId, userId), eq(tokenUsage.userId, targetId))).run().catch(() => {});
+
+  // 5. Delete all posts
+  await db.delete(posts).where(or(eq(posts.userId, userId), eq(posts.userId, targetId))).run().catch(() => {});
+
+  // 6. Delete user row
+  if (u) {
+    await db.delete(users).where(eq(users.id, u.id)).run().catch(() => {});
+  } else if (tgId) {
+    await db.delete(users).where(eq(users.tgId, tgId)).run().catch(() => {});
+  }
+
+  return true;
+}
+

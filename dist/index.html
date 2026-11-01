@@ -185,8 +185,9 @@
             <span>📊</span>
           </div>
           <div id="statTodayTokens" class="text-xl font-black text-indigo-300">۰</div>
-          <div id="statTokenSubtitle" class="text-[10px] text-slate-400 mt-1">
-            <span>مجموع مصرف زنده</span>
+          <div id="statTokenSubtitle" class="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
+            <span>مجموع مصرف</span>
+            <span id="statCostUsd" class="text-amber-400 font-mono text-[9px]">~$0.00</span>
           </div>
         </div>
 
@@ -674,6 +675,10 @@
         appState.tokenStats = data.tokenStats;
         const total = (data.tokenStats.allTime || data.tokenStats.week || 0).toLocaleString('fa-IR');
         document.getElementById('statTodayTokens').innerText = total;
+        const costEl = document.getElementById('statCostUsd');
+        if (costEl && data.tokenStats.cost) {
+          costEl.innerText = `~${data.tokenStats.cost.allTimeFormatted || '$0.00'}`;
+        }
       }
 
       appState.drafts = Array.isArray(data.drafts) ? data.drafts : [];
