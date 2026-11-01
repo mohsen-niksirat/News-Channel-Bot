@@ -134,8 +134,8 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
 پاسخ را الزاماً در قالب این شیء JSON معتبر بازگردان:
 {
   "title": "یک تیتر کوتاه، جذاب و ترغیب‌کننده فارسی",
-  "summary": "خلاصه ۲ تا ۳ خطی لید خبر",
-  "details": ["۲ تا ۳ نکته کلیدی تکمیلی خبر"],
+  "summary": "یک گزارش کامل، جامع و تحلیلی در قالب ۴ تا ۶ خط روان و منسجم شامل زمینه و تاریخچه خبر، جزئیات رویداد، آمارها و ارقام مهم، و پیامد یا تاثیر آن",
+  "details": ["نکته کلیدی، آمار یا نقل قول مهم ۱", "نکته کلیدی، آمار یا نقل قول مهم ۲"],
   "importance": 4,
   "category": "tech"
 }
@@ -188,8 +188,10 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
             aiSummary,
             sourceName: item.sourceName,
             sourceUrl: item.url,
+            details: parsed.details,
           },
           user,
+          details: parsed.details,
         });
 
         const saved = await saveDraftPost({

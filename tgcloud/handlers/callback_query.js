@@ -190,6 +190,11 @@ export default async function (query) {
       } catch {}
     }
 
+    // When replacing a photo message or when editMessageText fails, remove the old card so buttons don't stack
+    if (isEdit && mId) {
+      await api.deleteMessage({ chat_id: cId, message_id: mId }).catch(() => {});
+    }
+
     return await sendRichPostSafe({
       chatId: cId,
       postHtml: cardText,

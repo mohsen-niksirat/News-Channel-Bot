@@ -108,12 +108,87 @@ export function parseJinaTelegramMarkdown(md, cleanHandle) {
 }
 
 /**
- * Extracts posts from a public Telegram channel (Jina reader + t.me fallback)
+ * Parses raw Telegram web preview HTML into structured items
+ */
+export function parseTelegramWebHtml(html, cleanHandle) {
+  if (!html) return [];
+  const items = [];
+  const rawWidgets = html.split('<div class="tgme_widget_message_wrap');
+  for (let i = 1; i < rawWidgets.length; i++) {
+    const chunk = rawWidgets[i];
+
+    let postUrl = '';
+    let msgId = '';
+    const dpMatch = chunk.match(/data-post="([^"/]+)\/(\d+)"/i);
+    if (dpMatch) {
+      msgId = dpMatch[2];
+      postUrl = `https://t.me/${dpMatch[1]}/${msgId}`;
+    } else {
+      const linkMatch = chunk.match(/href="([^"]*t\.me\/([a-zA-Z0-9_]+)\/(\d+))"/i);
+      if (linkMatch) {
+        msgId = linkMatch[3];
+        postUrl = `https://t.me/${linkMatch[2]}/${msgId}`;
+      }
+    }
+    if (!postUrl || !msgId) continue;
+
+    const textMatch = chunk.match(/<div class="tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/);
+    const rawContent = textMatch ? textMatch[1] : '';
+    const plain = cleanText(rawContent);
+    if (!plain || plain.length < 20) continue;
+
+    let imageUrl = null;
+    const imgMatch = chunk.match(/background-image:\s*url\('([^']+)'\)/);
+    if (imgMatch) {
+      imageUrl = imgMatch[1];
+    }
+
+    const dateMatch = chunk.match(/datetime="([^"]+)"/);
+    const dateStr = dateMatch ? dateMatch[1] : null;
+
+    const hash = hashString(`${cleanHandle}_${msgId}_${plain.slice(0, 50)}`);
+
+    items.push({
+      sourceType: 'telegram',
+      sourceName: `@${cleanHandle}`,
+      url: postUrl,
+      title: plain.slice(0, 75).split('\n')[0],
+      content: plain,
+      imageUrl,
+      date: dateStr,
+      hash,
+    });
+  }
+  return items;
+}
+
+/**
+ * Extracts posts from a public Telegram channel (Google web proxy + Jina reader + direct t.me)
  */
 export async function harvestTelegramChannel(channelHandle, maxPosts = 2, customCache = globalJinaCache) {
   const cleanHandle = channelHandle.replace(/^@/, '').replace(/^(?:https?:\/\/)?(?:t\.me|telegram\.me)\/(?:s\/)?/i, '').trim();
 
-  // Method 1: Jina Reader Proxy (Bypasses Telegram Serverless egress restrictions on t.me)
+  // Method 1: Google Translate Proxy (Bypasses Telegram AS9009 IP blocks without authentication)
+  try {
+    const gUrl = `https://translate.google.com/translate?sl=auto&tl=fa&u=https://t.me/s/${cleanHandle}`;
+    const gHtml = await cachedFetchText(gUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+    }, fetch, customCache);
+
+    if (gHtml) {
+      const items = parseTelegramWebHtml(gHtml, cleanHandle);
+      if (items.length > 0) {
+        return items.slice(-maxPosts);
+      }
+    }
+  } catch (gErr) {
+    console.warn(`Google proxy harvest failed for @${cleanHandle}:`, gErr.message);
+  }
+
+  // Method 2: Jina Reader Proxy (Bypasses Telegram Serverless egress restrictions on t.me)
   try {
     const jinaUrl = `https://r.jina.ai/https://t.me/s/${cleanHandle}`;
     const text = await cachedFetchText(jinaUrl, {
@@ -133,7 +208,7 @@ export async function harvestTelegramChannel(channelHandle, maxPosts = 2, custom
     console.warn(`Jina proxy harvest failed for @${cleanHandle}:`, jinaErr.message);
   }
 
-  // Method 2: Direct t.me/s web preview (Fallback for non-serverless environments)
+  // Method 3: Direct t.me/s web preview (Fallback for non-serverless environments)
   const url = `https://t.me/s/${cleanHandle}`;
   try {
     const html = await cachedFetchText(url, {
@@ -147,45 +222,7 @@ export async function harvestTelegramChannel(channelHandle, maxPosts = 2, custom
       return [];
     }
 
-    const items = [];
-
-    const rawWidgets = html.split('<div class="tgme_widget_message_wrap');
-    for (let i = 1; i < rawWidgets.length; i++) {
-      const chunk = rawWidgets[i];
-
-      const linkMatch = chunk.match(/href="(https:\/\/t\.me\/[^"]+\/(\d+))"/);
-      const postUrl = linkMatch ? linkMatch[1] : '';
-      const msgId = linkMatch ? linkMatch[2] : '';
-      if (!postUrl || !msgId) continue;
-
-      const textMatch = chunk.match(/<div class="tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/);
-      const rawContent = textMatch ? textMatch[1] : '';
-      const plain = cleanText(rawContent);
-      if (!plain || plain.length < 20) continue;
-
-      let imageUrl = null;
-      const imgMatch = chunk.match(/background-image:\s*url\('([^']+)'\)/);
-      if (imgMatch) {
-        imageUrl = imgMatch[1];
-      }
-
-      const dateMatch = chunk.match(/datetime="([^"]+)"/);
-      const dateStr = dateMatch ? dateMatch[1] : null;
-
-      const hash = hashString(`${cleanHandle}_${msgId}_${plain.slice(0, 50)}`);
-
-      items.push({
-        sourceType: 'telegram',
-        sourceName: `@${cleanHandle}`,
-        url: postUrl,
-        title: plain.slice(0, 75).split('\n')[0],
-        content: plain,
-        imageUrl,
-        date: dateStr,
-        hash,
-      });
-    }
-
+    const items = parseTelegramWebHtml(html, cleanHandle);
     return items.slice(-maxPosts);
   } catch (err) {
     console.error(`harvestTelegramChannel: direct exception for ${url}:`, err.message);

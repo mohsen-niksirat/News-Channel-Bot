@@ -5,9 +5,9 @@
  */
 
 import { db, fetch } from 'sdk';
-import { eq, and, sql, asc } from 'sdk/db';
+import { eq, and, or, sql, asc } from 'sdk/db';
 import { aiKeys } from 'schema';
-import { getCustomProviderBySlug, recordTokenUsage } from 'lib/db';
+import { getUser, getCustomProviderBySlug, recordTokenUsage } from 'lib/db';
 
 export const DEFAULT_MODELS = {
   gemini: 'gemini-3.1-flash-lite',
@@ -30,11 +30,14 @@ export const ROUTING_POLICIES = {
 export async function getNextAvailableKey(provider, userId, policy = 'fallback') {
   if (!userId) return null;
   const now = Math.floor(Date.now() / 1000);
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
+  const userCond = or(eq(aiKeys.userId, userId), eq(aiKeys.userId, targetId));
 
   const baseConds = [
     eq(aiKeys.provider, provider),
     eq(aiKeys.status, 'active'),
-    eq(aiKeys.userId, userId),
+    userCond,
   ];
 
   let query = db
@@ -59,7 +62,7 @@ export async function getNextAvailableKey(provider, userId, policy = 'fallback')
       eq(aiKeys.provider, provider),
       eq(aiKeys.status, 'cooldown'),
       sql`cooldown_until <= ${now}`,
-      eq(aiKeys.userId, userId),
+      userCond,
     ];
 
     const recovered = await db
@@ -77,8 +80,7 @@ export async function getNextAvailableKey(provider, userId, policy = 'fallback')
 
   // 3. Fallback: if all keys are currently marked cooldown, reactivate the oldest key so bot never hangs
   if (!keyRow) {
-    const fbConds = [eq(aiKeys.provider, provider)];
-    if (userId) fbConds.push(eq(aiKeys.userId, userId));
+    const fbConds = [eq(aiKeys.provider, provider), userCond];
 
     const fallbackKey = await db
       .select()
@@ -295,9 +297,13 @@ export async function generateNewsRewrite({
 
       let model = preferredModel;
       if (customProv) {
-        model = model || customProv.defaultModel || 'default';
-      } else if (!model || model.includes('1.5') || model.includes('2.0') || model.includes('2.5')) {
-        model = DEFAULT_MODELS[provider] || 'gemini-3.1-flash-lite';
+        if (!model || model.startsWith('gemini') || model === 'default') {
+          model = customProv.defaultModel || 'claude-sonnet-5';
+        }
+      } else {
+        if (!model || model.startsWith('claude') || model.includes('sonnet') || model.includes('1.5') || model.includes('2.0') || model.includes('2.5')) {
+          model = DEFAULT_MODELS[provider] || 'gemini-3.1-flash-lite';
+        }
       }
 
       try {

@@ -256,9 +256,10 @@ export async function sendRichPostSafe({
  * Guarantees headline, summary, source link, divider line,
  * and the user's custom channel footer tags.
  */
-export function preparePostForPublishing({ post, user }) {
+export function preparePostForPublishing({ post, user, details = null }) {
   let title = (post?.aiTitle || post?.originalTitle || post?.title || '').trim();
   let summary = (post?.aiSummary || post?.summary || '').trim();
+  const rawDetails = details || post?.details || post?.deepDive || post?.aiDetails;
   const sourceName = (post?.sourceName || 'منبع').trim();
   const sourceUrl = (post?.sourceUrl || post?.url || '').trim();
   const defaultFooter = '📢 کانال خبر : @theNews_Persian\n📢 کانال مرجع: @MyLeitner';
@@ -302,6 +303,18 @@ export function preparePostForPublishing({ post, user }) {
     clean = clean.replace(/^[⚡🔹]\s*/, '').trim();
     if (clean) {
       body += `${clean}\n\n`;
+    }
+  }
+
+  if (rawDetails) {
+    const detailList = Array.isArray(rawDetails) ? rawDetails : [rawDetails];
+    const bulletLines = detailList
+      .map((d) => String(d).trim())
+      .filter((d) => d.length > 0)
+      .map((d) => `▫️ ${escHtml(d.replace(/^[▫️•\-\*]\s*/, ''))}`)
+      .join('\n');
+    if (bulletLines) {
+      body += `${bulletLines}\n\n`;
     }
   }
 

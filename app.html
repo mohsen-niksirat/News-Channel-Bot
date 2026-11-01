@@ -1243,21 +1243,6 @@
         showToast('خطای شبکه', '❌');
       }
     }
-            btn.disabled = false;
-            btn.innerText = origText;
-            btn.classList.remove('opacity-75', 'cursor-not-allowed');
-          }
-          showToast(res?.error || 'خطا در رد پیش‌نویس', '❌');
-        }
-      } catch (err) {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerText = origText;
-          btn.classList.remove('opacity-75', 'cursor-not-allowed');
-        }
-        showToast('خطای شبکه', '❌');
-      }
-    }
 
     function saveRoutingPolicy(pol) {
       haptic('light');
