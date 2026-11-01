@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] — 2026-11-01
+
+### 🔒 Security patch
+- Fixed `ai_keys` table schema regression (`apiKey` column syntax restored) and added structural regression test guard.
+- Hardened Mini App API authentication: implemented strict cryptographic HMAC-SHA256 verification of Telegram `initData` and keyed bearer tokens (old unkeyed tokens invalidated).
+- Secured `add_sources` endpoint: removed hardcoded admin fallback and enforced admin-only authorization gate.
+
+---
+
 ## [1.2.0] — 2026-11-01
 
 ### 🚀 Highlights
