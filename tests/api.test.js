@@ -1,38 +1,61 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { db, resetMockDb } from 'sdk';
 import { users, posts, aiKeys, sources, tokenUsage } from 'schema';
-import apiHandler, { validateApiAuth } from '../tgcloud/endpoints/api.js';
+import apiHandler, {
+  validateApiAuth,
+  setBotTokenForTests,
+  computeSignedToken,
+} from '../tgcloud/endpoints/api.js';
 import { hashString } from '../tgcloud/lib/harvester.js';
 
-test('api.js: validateApiAuth handles tokens, initData, and unauthenticated requests', () => {
+const TEST_BOT_TOKEN = '123456789:ABCdefGHIjklMNOpqrsTUVwxyz_TEST_TOKEN';
+
+test('api.js: validateApiAuth handles cryptographic HMAC initData, HMAC tokens, and rejects forged requests', () => {
+  setBotTokenForTests(TEST_BOT_TOKEN);
   const uid = 12345678;
-  const validToken = `${uid}:${hashString(`newsstudio_auth_${uid}`)}`;
-  const invalidToken = `${uid}:invalid_hash_signature`;
 
   // 1. Unauthenticated request without token/initData
   const unauth = validateApiAuth({ action: 'draft/action', id: 1 }, {});
   assert.strictEqual(unauth.authenticated, false);
   assert.strictEqual(unauth.userId, null);
 
-  // 2. Valid signed token
-  const authWithToken = validateApiAuth({ token: validToken }, {});
-  assert.strictEqual(authWithToken.authenticated, true);
-  assert.strictEqual(authWithToken.userId, uid);
-  assert.strictEqual(authWithToken.source, 'signed_token');
+  // 2. Forged initData (wrong hash) -> Rejected
+  const forgedInitData = `auth_date=1700000000&query_id=AAHdF6IQAAAAAN0XohDhrOrc&user=${encodeURIComponent(JSON.stringify({ id: uid, first_name: 'Tester' }))}&hash=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`;
+  const authWithForgedInit = validateApiAuth({ initData: forgedInitData }, {});
+  assert.strictEqual(authWithForgedInit.authenticated, false);
 
-  // 3. Invalid token signature
-  const authWithBadToken = validateApiAuth({ token: invalidToken }, {});
+  // 3. Correctly HMAC-signed initData -> Accepted
+  const userJson = JSON.stringify({ id: uid, first_name: 'Tester' });
+  const dataCheckString = `auth_date=1700000000\nquery_id=AAHdF6IQAAAAAN0XohDhrOrc\nuser=${userJson}`;
+  const secretKey = createHmac('sha256', 'WebAppData').update(TEST_BOT_TOKEN).digest();
+  const validHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+  const validInitData = `auth_date=1700000000&query_id=AAHdF6IQAAAAAN0XohDhrOrc&user=${encodeURIComponent(userJson)}&hash=${validHash}`;
+
+  const authWithValidInit = validateApiAuth({ initData: validInitData }, {});
+  assert.strictEqual(authWithValidInit.authenticated, true);
+  assert.strictEqual(authWithValidInit.userId, uid);
+  assert.strictEqual(authWithValidInit.source, 'raw_init_data');
+
+  // 4. Forged old-style unkeyed hashString token -> Rejected
+  const oldStyleForgedToken = `${uid}:${hashString(`newsstudio_auth_${uid}`)}`;
+  const authWithOldToken = validateApiAuth({ token: oldStyleForgedToken }, {});
+  assert.strictEqual(authWithOldToken.authenticated, false);
+
+  // 5. Correctly HMAC-SHA256 signed token -> Accepted
+  const validHmacToken = computeSignedToken(uid, TEST_BOT_TOKEN);
+  const authWithValidToken = validateApiAuth({ token: validHmacToken }, {});
+  assert.strictEqual(authWithValidToken.authenticated, true);
+  assert.strictEqual(authWithValidToken.userId, uid);
+  assert.strictEqual(authWithValidToken.source, 'signed_token');
+
+  // 6. Invalid token signature -> Rejected
+  const badHmacToken = `${uid}:${'f'.repeat(64)}`;
+  const authWithBadToken = validateApiAuth({ token: badHmacToken }, {});
   assert.strictEqual(authWithBadToken.authenticated, false);
 
-  // 4. Raw initData parameter
-  const rawInitData = `user=${encodeURIComponent(JSON.stringify({ id: uid, first_name: 'Tester' }))}&hash=abcdef123456`;
-  const authWithInitData = validateApiAuth({ initData: rawInitData }, {});
-  assert.strictEqual(authWithInitData.authenticated, true);
-  assert.strictEqual(authWithInitData.userId, uid);
-  assert.strictEqual(authWithInitData.source, 'raw_init_data');
-
-  // 5. Read-only fallback for Mini App dashboard load
+  // 7. Read-only fallback for Mini App dashboard load
   const readOnlyAuth = validateApiAuth({ action: 'overview', userId: uid }, {});
   assert.strictEqual(readOnlyAuth.authenticated, true);
   assert.strictEqual(readOnlyAuth.userId, uid);
@@ -41,8 +64,9 @@ test('api.js: validateApiAuth handles tokens, initData, and unauthenticated requ
 
 test('api.js: endpoint overview, drafts, and keys/sources return structured data', async () => {
   resetMockDb();
+  setBotTokenForTests(TEST_BOT_TOKEN);
   const testUid = 88889999;
-  const token = `${testUid}:${hashString(`newsstudio_auth_${testUid}`)}`;
+  const token = computeSignedToken(testUid, TEST_BOT_TOKEN);
 
   // Insert user
   await db.insert(users).values({
@@ -140,8 +164,9 @@ test('api.js: endpoint overview, drafts, and keys/sources return structured data
 
 test('api.js: action draft/action handles publish, reject, and edit with auth gate', async () => {
   resetMockDb();
+  setBotTokenForTests(TEST_BOT_TOKEN);
   const testUid = 77778888;
-  const token = `${testUid}:${hashString(`newsstudio_auth_${testUid}`)}`;
+  const token = computeSignedToken(testUid, TEST_BOT_TOKEN);
 
   await db.insert(users).values({
     id: 2,

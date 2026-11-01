@@ -6,6 +6,7 @@
 import { db, api, fetch } from 'sdk';
 import { eq, and, or } from 'sdk/db';
 import { users, aiKeys, sources, customProviders, posts } from 'schema';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import {
   getUser,
   getUserSources,
@@ -31,6 +32,106 @@ import { runHealthCheckForUser } from 'lib/health_check';
 import { runScanForUser } from 'lib/scanner';
 import { buildPostButtons, sendRichPostSafe, preparePostForPublishing, escHtml } from 'lib/rich_post';
 
+// Module-level testing hook for injected bot token secret
+let injectedBotToken = null;
+
+export function setBotTokenForTests(token) {
+  injectedBotToken = token;
+}
+
+/**
+ * Resolves the Telegram bot token secret from the runtime environment.
+ * The tgcloud serverless runtime exposes credentials through ctx or environment variables.
+ * 
+ * @param {object} [ctx]
+ * @returns {string}
+ */
+export function getBotToken(ctx = null) {
+  if (injectedBotToken) return injectedBotToken;
+  return (
+    ctx?.botToken ||
+    ctx?.env?.BOT_TOKEN ||
+    ctx?.env?.TELEGRAM_BOT_TOKEN ||
+    (typeof process !== 'undefined' ? (process.env?.BOT_TOKEN || process.env?.TELEGRAM_BOT_TOKEN || '') : '')
+  );
+}
+
+/**
+ * Computes a keyed HMAC-SHA256 bearer token for secure deep-linked access.
+ * Format: <userId>:<HMAC_SHA256_HEX(key=botToken, message="newsstudio_auth_" + userId)>
+ * 
+ * @param {number|string} userId
+ * @param {string} [botToken]
+ * @returns {string}
+ */
+export function computeSignedToken(userId, botToken = null) {
+  const uid = parseInt(userId, 10);
+  if (!uid) return '';
+  const secret = botToken || getBotToken();
+  if (!secret) return '';
+  const sig = createHmac('sha256', secret).update(`newsstudio_auth_${uid}`).digest('hex');
+  return `${uid}:${sig}`;
+}
+
+/**
+ * Performs cryptographic HMAC-SHA256 verification of Telegram WebApp initData.
+ * Implements Telegram's official data-check-string verification algorithm:
+ *   secret_key = HMAC_SHA256(key="WebAppData", message=botToken)
+ *   calculated_hash = HMAC_SHA256(key=secret_key, message=data_check_string)
+ * 
+ * @param {string} rawInitData
+ * @param {string} botToken
+ * @returns {{ ok: boolean, user?: object, error?: string }}
+ */
+export function verifyTelegramInitData(rawInitData, botToken) {
+  if (!rawInitData || typeof rawInitData !== 'string' || !botToken) {
+    return { ok: false, error: 'Missing initData or bot token' };
+  }
+
+  try {
+    const sp = new URLSearchParams(rawInitData);
+    const hash = sp.get('hash');
+    if (!hash || hash.length !== 64) {
+      return { ok: false, error: 'Missing or invalid hash parameter' };
+    }
+
+    const keys = [];
+    for (const [k] of sp.entries()) {
+      if (k !== 'hash') {
+        keys.push(k);
+      }
+    }
+    keys.sort();
+
+    const dataCheckString = keys.map((k) => `${k}=${sp.get(k)}`).join('\n');
+    const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
+    const calculatedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+    const hashBuf = Buffer.from(hash, 'hex');
+    const calcBuf = Buffer.from(calculatedHash, 'hex');
+
+    if (hashBuf.length !== 32 || calcBuf.length !== 32) {
+      return { ok: false, error: 'Hash length mismatch' };
+    }
+
+    if (!timingSafeEqual(hashBuf, calcBuf)) {
+      return { ok: false, error: 'HMAC signature mismatch' };
+    }
+
+    const userStr = sp.get('user');
+    let user = null;
+    if (userStr) {
+      try {
+        user = JSON.parse(userStr);
+      } catch {}
+    }
+
+    return { ok: true, user, authDate: sp.get('auth_date') };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 /**
  * Validates request authentication via Telegram initData or lightweight signed token.
  * Rejects unsigned requests to prevent unauthorized manipulation.
@@ -41,40 +142,44 @@ import { buildPostButtons, sendRichPostSafe, preparePostForPublishing, escHtml }
  */
 export function validateApiAuth(input, ctx) {
   const action = input?.action || 'get_data';
+  const botToken = getBotToken(ctx);
+
   // 1. Telegram runtime verified initData
   if (ctx?.initData?.user?.id) {
     return { authenticated: true, userId: ctx.initData.user.id, source: 'ctx_init_data' };
   }
 
-  // 2. Raw initData string in headers or body
+  // 2. Raw initData string in headers or body — Cryptographic HMAC-SHA256 verified
   const rawInitData =
     ctx?.headers?.['x-telegram-init-data'] ||
     ctx?.headers?.['authorization']?.replace(/^(?:tma|bearer)\s+/i, '') ||
     input?.initData;
 
   if (rawInitData && typeof rawInitData === 'string') {
-    try {
-      const sp = new URLSearchParams(rawInitData);
-      const userStr = sp.get('user');
-      const hash = sp.get('hash');
-      if (userStr && hash) {
-        const u = JSON.parse(userStr);
-        if (u && u.id) {
-          return { authenticated: true, userId: u.id, source: 'raw_init_data' };
-        }
+    if (botToken) {
+      const verified = verifyTelegramInitData(rawInitData, botToken);
+      if (verified.ok && verified.user?.id) {
+        return { authenticated: true, userId: verified.user.id, source: 'raw_init_data' };
       }
-    } catch {}
+    }
   }
 
-  // 3. Lightweight signed token: <uid>:<hashString("newsstudio_auth_" + uid)>
+  // 3. Cryptographically keyed HMAC-SHA256 signed token: <uid>:<hmac_sha256(key=botToken, msg="newsstudio_auth_" + uid)>
   const token = input?.token || ctx?.headers?.['x-news-token'];
-  if (token && typeof token === 'string') {
-    const parts = token.split(':');
-    if (parts.length === 2) {
-      const uid = parseInt(parts[0], 10);
-      const expected = hashString(`newsstudio_auth_${uid}`);
-      if (uid && parts[1] === expected) {
-        return { authenticated: true, userId: uid, source: 'signed_token' };
+  if (token && typeof token === 'string' && botToken) {
+    const colonIdx = token.indexOf(':');
+    if (colonIdx > 0) {
+      const uid = parseInt(token.slice(0, colonIdx), 10);
+      const providedSig = token.slice(colonIdx + 1);
+      if (uid && providedSig && providedSig.length === 64) {
+        const expectedSig = createHmac('sha256', botToken).update(`newsstudio_auth_${uid}`).digest('hex');
+        try {
+          const sigBuf = Buffer.from(providedSig, 'hex');
+          const expBuf = Buffer.from(expectedSig, 'hex');
+          if (sigBuf.length === 32 && expBuf.length === 32 && timingSafeEqual(sigBuf, expBuf)) {
+            return { authenticated: true, userId: uid, source: 'signed_token' };
+          }
+        } catch {}
       }
     }
   }

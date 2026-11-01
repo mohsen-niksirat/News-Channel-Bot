@@ -4,14 +4,14 @@
 
 import { ROUTING_POLICIES } from 'lib/ai_router';
 import { ADMIN_ID } from 'lib/db';
-import { hashString } from 'lib/harvester';
+import { computeSignedToken } from 'endpoints/api';
 import { TONE_PROFILES } from 'lib/tones';
 import { VALID_CATEGORIES, CATEGORY_LABELS, parseSourceCategories } from 'lib/categories';
 import { parseScheduleWindows, formatScheduleWindowsPersian } from 'lib/schedule';
 
-export function buildMiniAppUrl(tgId) {
+export function buildMiniAppUrl(tgId, botToken = null) {
   const uid = tgId || ADMIN_ID;
-  const token = `${uid}:${hashString('newsstudio_auth_' + uid)}`;
+  const token = computeSignedToken(uid, botToken);
   return `https://app9260009899.tgcloud.ai/?uid=${uid}&token=${token}`;
 }
 
