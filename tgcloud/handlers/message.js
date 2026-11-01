@@ -40,9 +40,11 @@ import {
   adminStatsKeyboard,
   toneSelectionKeyboard,
   backToMenuKeyboard,
+  deleteAccountConfirmationKeyboard,
 } from 'lib/keyboards';
 import { TONE_PROFILES } from 'lib/tones';
 import { isValidTimeFormat, parseScheduleWindows, formatScheduleWindowsPersian } from 'lib/schedule';
+import { formatCostUsd } from 'lib/pricing';
 
 export default async function (message) {
   if (!message || !message.chat) return;
@@ -569,26 +571,46 @@ export default async function (message) {
   if (text === '/tokens' || text === '📊 آمار مصرف توکن‌ها') {
     const stats = await getTokenUsageStats(from.id);
     const provLines = Object.entries(stats.byProvider)
-      .map(([p, c]) => `• <b>${p}</b>: <code>${c.toLocaleString('fa-IR')}</code> توکن`)
+      .map(([p, c]) => {
+        const cost = stats.providerCosts?.[p.toLowerCase()] || 0;
+        return `• <b>${p}</b>: <code>${c.toLocaleString('fa-IR')}</code> توکن (~${formatCostUsd(cost)})`;
+      })
       .join('\n');
 
     const msg =
       `📊 <b>داشبورد تحلیل مصرف توکن‌ها و هزینه‌ها:</b>\n\n` +
-      `🗓️ <b>امروز:</b> <code>${stats.today.total.toLocaleString('fa-IR')}</code> توکن\n` +
+      `🗓️ <b>امروز:</b> <code>${stats.today.total.toLocaleString('fa-IR')}</code> توکن (~${stats.cost?.todayFormatted || '$0.00'})\n` +
       `├ ورودی (Prompt): <code>${stats.today.prompt.toLocaleString('fa-IR')}</code>\n` +
       `└ خروجی (Completion): <code>${stats.today.completion.toLocaleString('fa-IR')}</code>\n\n` +
-      `📅 <b>۷ روز گذشته:</b> <code>${stats.week.toLocaleString('fa-IR')}</code> توکن\n` +
-      `📆 <b>۳۰ روز گذشته (ماهانه):</b> <code>${stats.month.toLocaleString('fa-IR')}</code> توکن\n` +
-      `🌐 <b>کل مصرف از ابتدا:</b> <code>${stats.allTime.toLocaleString('fa-IR')}</code> توکن\n\n` +
-      `🔹 <b>مصرف بر اساس پرووایدرها:</b>\n` +
+      `📅 <b>۷ روز گذشته:</b> <code>${stats.week.toLocaleString('fa-IR')}</code> توکن (~${stats.cost?.weekFormatted || '$0.00'})\n` +
+      `📆 <b>۳۰ روز گذشته (ماهانه):</b> <code>${stats.month.toLocaleString('fa-IR')}</code> توکن (~${stats.cost?.monthFormatted || '$0.00'})\n` +
+      `🌐 <b>کل مصرف از ابتدا:</b> <code>${stats.allTime.toLocaleString('fa-IR')}</code> توکن (~${stats.cost?.allTimeFormatted || '$0.00'})\n\n` +
+      `💰 <b>هزینه تقریبی کل مصرف:</b> <code>${stats.cost?.allTimeFormatted || '$0.00'}</code>\n\n` +
+      `🔹 <b>مصرف به تفکیک سرویس‌دهنده‌ها:</b>\n` +
       (provLines || 'هنوز مصرفی ثبت نشده است.') +
-      `\n\n💡 <i>روتر هوشمند با توزیع بار و کش، مانع از سوختن توکن‌ها و محدودیت نرخ (429) می‌شود.</i>`;
+      `\n\n💡 <i>${stats.cost?.disclaimer || 'تعرفه‌ها تقریبی و بر مبنای نرخ رسمی هر ۱ میلیون توکن است.'} (آخرین به‌روزرسانی: ${stats.cost?.lastUpdated || '2026-10-31'})</i>`;
 
     await api.sendMessage({
       chat_id: chat.id,
       text: msg,
       parse_mode: 'HTML',
       reply_markup: backToMenuKeyboard(),
+    });
+    return;
+  }
+
+  // 6.2. Delete Account Command (/delete)
+  if (text === '/delete' || text === '🗑️ حذف کامل حساب کاربری') {
+    const warningMsg =
+      `⚠️ <b>هشدار حذف کامل حساب کاربری و اطلاعات</b>\n\n` +
+      `آیا از حذف کامل حساب کاربری، تمامی فیدها و منابع خبری، کلیدهای هوش مصنوعی، تاریخچه پیش‌نویس‌ها و آمار توکن‌های خود اطمینان دارید؟\n\n` +
+      `🔴 این عملیات <b>غیرقابل بازگشت</b> است و تمامی اطلاعات شما بلافاصله از پایگاه داده سرور پاک خواهند شد.`;
+
+    await api.sendMessage({
+      chat_id: chat.id,
+      text: warningMsg,
+      parse_mode: 'HTML',
+      reply_markup: deleteAccountConfirmationKeyboard(),
     });
     return;
   }

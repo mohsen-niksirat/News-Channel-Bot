@@ -476,3 +476,17 @@ export function healthCheckKeyboard() {
     ],
   };
 }
+
+export function deleteAccountConfirmationKeyboard() {
+  return {
+    inline_keyboard: [
+      [
+        { text: '⚠️ بله، کل حساب و اطلاعات مرا پاک کن', callback_data: 'act:delete_account_confirm' },
+      ],
+      [
+        { text: '🔙 انصراف و بازگشت به منو', callback_data: 'act:delete_account_cancel' },
+      ],
+    ],
+  };
+}
+

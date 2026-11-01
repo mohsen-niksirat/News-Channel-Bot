@@ -20,10 +20,12 @@ import {
   getPostById,
   markPostPublished,
   markPostRejected,
+  wipeUserData,
   ADMIN_ID,
   getAdminPlatformStats,
   formatAdminStatsMessage,
 } from 'lib/db';
+import { formatCostUsd } from 'lib/pricing';
 import { runScanForUser } from 'lib/scanner';
 import { generateNewsRewrite, ROUTING_POLICIES } from 'lib/ai_router';
 import { runHealthCheckForUser } from 'lib/health_check';
@@ -768,20 +770,24 @@ export default async function (query) {
   if (data === 'm:token_stats') {
     const stats = await getTokenUsageStats(from.id);
     const provLines = Object.entries(stats.byProvider)
-      .map(([p, c]) => `• <b>${p}</b>: <code>${c.toLocaleString('fa-IR')}</code> توکن`)
+      .map(([p, c]) => {
+        const cost = stats.providerCosts?.[p.toLowerCase()] || 0;
+        return `• <b>${p}</b>: <code>${c.toLocaleString('fa-IR')}</code> توکن (~${formatCostUsd(cost)})`;
+      })
       .join('\n');
 
     const msg =
       `📊 <b>داشبورد تحلیل مصرف توکن‌ها و هزینه‌ها:</b>\n\n` +
-      `🗓️ <b>امروز:</b> <code>${stats.today.total.toLocaleString('fa-IR')}</code> توکن\n` +
+      `🗓️ <b>امروز:</b> <code>${stats.today.total.toLocaleString('fa-IR')}</code> توکن (~${stats.cost?.todayFormatted || '$0.00'})\n` +
       `├ ورودی (Prompt): <code>${stats.today.prompt.toLocaleString('fa-IR')}</code>\n` +
       `└ خروجی (Completion): <code>${stats.today.completion.toLocaleString('fa-IR')}</code>\n\n` +
-      `📅 <b>۷ روز گذشته:</b> <code>${stats.week.toLocaleString('fa-IR')}</code> توکن\n` +
-      `📆 <b>۳۰ روز گذشته (ماهانه):</b> <code>${stats.month.toLocaleString('fa-IR')}</code> توکن\n` +
-      `🌐 <b>کل مصرف از ابتدا:</b> <code>${stats.allTime.toLocaleString('fa-IR')}</code> توکن\n\n` +
-      `🔹 <b>مصرف بر اساس پرووایدرها:</b>\n` +
+      `📅 <b>۷ روز گذشته:</b> <code>${stats.week.toLocaleString('fa-IR')}</code> توکن (~${stats.cost?.weekFormatted || '$0.00'})\n` +
+      `📆 <b>۳۰ روز گذشته (ماهانه):</b> <code>${stats.month.toLocaleString('fa-IR')}</code> توکن (~${stats.cost?.monthFormatted || '$0.00'})\n` +
+      `🌐 <b>کل مصرف از ابتدا:</b> <code>${stats.allTime.toLocaleString('fa-IR')}</code> توکن (~${stats.cost?.allTimeFormatted || '$0.00'})\n\n` +
+      `💰 <b>هزینه تقریبی کل مصرف:</b> <code>${stats.cost?.allTimeFormatted || '$0.00'}</code>\n\n` +
+      `🔹 <b>مصرف به تفکیک سرویس‌دهنده‌ها:</b>\n` +
       (provLines || 'هنوز مصرفی ثبت نشده است.') +
-      `\n\n💡 <i>روتر هوشمند با توزیع بار و کش، مانع از سوختن توکن‌ها و محدودیت نرخ (429) می‌شود.</i>`;
+      `\n\n💡 <i>${stats.cost?.disclaimer || 'تعرفه‌ها تقریبی و بر مبنای نرخ رسمی هر ۱ میلیون توکن است.'} (آخرین به‌روزرسانی: ${stats.cost?.lastUpdated || '2026-10-31'})</i>`;
 
     await api.sendMessage({
       chat_id: chatId,
@@ -789,6 +795,57 @@ export default async function (query) {
       parse_mode: 'HTML',
       reply_markup: backToMenuKeyboard(),
     });
+    return;
+  }
+
+  // Delete Account Confirmation Actions
+  if (data === 'act:delete_account_confirm') {
+    await wipeUserData(from.id);
+    await api.answerCallbackQuery({
+      callback_query_id: query.id,
+      text: 'حساب کاربری شما و تمامی اطلاعات با موفقیت حذف شدند.',
+      show_alert: true,
+    });
+    try {
+      await api.editMessageText({
+        chat_id: chatId,
+        message_id: messageId,
+        text:
+          `🗑️ <b>حساب کاربری شما و تمامی داده‌ها با موفقیت پاک شدند.</b>\n\n` +
+          `از همراهی شما سپاسگزاریم. برای ثبت‌نام یا ایجاد حساب جدید، هر زمان می‌توانید با ارسال دستور /start مجدداً شروع کنید.`,
+        parse_mode: 'HTML',
+      });
+    } catch {
+      await api.sendMessage({
+        chat_id: chatId,
+        text:
+          `🗑️ <b>حساب کاربری شما و تمامی داده‌ها با موفقیت پاک شدند.</b>\n\n` +
+          `از همراهی شما سپاسگزاریم. برای ثبت‌نام یا ایجاد حساب جدید، هر زمان می‌توانید با ارسال دستور /start مجدداً شروع کنید.`,
+        parse_mode: 'HTML',
+      });
+    }
+    return;
+  }
+
+  if (data === 'act:delete_account_cancel') {
+    await api.answerCallbackQuery({
+      callback_query_id: query.id,
+      text: 'عملیات حذف لغو گردید.',
+    });
+    try {
+      await api.editMessageText({
+        chat_id: chatId,
+        message_id: messageId,
+        text: '❌ عملیات حذف حساب کاربری لغو شد. تمامی اطلاعات شما دست‌نخورده باقی ماندند.',
+        reply_markup: backToMenuKeyboard(),
+      });
+    } catch {
+      await api.sendMessage({
+        chat_id: chatId,
+        text: '❌ عملیات حذف حساب کاربری لغو شد. تمامی اطلاعات شما دست‌نخورده باقی ماندند.',
+        reply_markup: backToMenuKeyboard(),
+      });
+    }
     return;
   }
 
