@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { db, resetMockDb, setMockFetch, sentMessages } from 'sdk';
 import { users, sources, aiKeys, posts } from 'schema';
 import { runScanForUser } from 'lib/scanner';
-import { buildBulletinPost, preparePostForPublishing } from 'lib/rich_post';
+import { buildBulletinPost, preparePostForPublishing, truncateHtmlPreservingTags, normalizeButtonUrl, sendRichPostSafe } from 'lib/rich_post';
 
 test('[TITLE]/[SUMMARY]/[DETAILS] parsing logic in preparePostForPublishing and editorial format', () => {
   const fullText = `[TITLE]: رونمایی از محصول انقلابی
@@ -289,4 +289,52 @@ test('runScanForUser: category filtering skips items whose category is disabled 
   // The item should be skipped and NOT saved to posts because 'economy' is disabled for this source
   const saved = await db.select().from(posts).where((r) => r.userId === 700).get();
   assert.equal(Boolean(saved), false, 'Item with disabled category must be filtered out');
+});
+
+test('truncateHtmlPreservingTags: strictly keeps tags balanced and respects max length', () => {
+  const longHtml = '🔹 <b>🚀 تیتر بسیار طولانی و جذاب</b>\n\n<blockquote expandable>این یک متن خیلی خیلی طولانی است که قصد داریم آن را در داخل یک تگ مسدود بازشونده قرار دهیم و ادامه آن را ببینیم. <a href="https://example.com/test">لینک مطالعه کامل</a> و دیگر مطالب تکمیلی.</blockquote>';
+
+  for (let budget = 40; budget <= 200; budget += 20) {
+    const res = truncateHtmlPreservingTags(longHtml, budget);
+    assert.ok(res.length <= budget, `Length ${res.length} must be <= budget ${budget}`);
+
+    // Count open vs close tags with word boundary to avoid matching <b> inside <blockquote>
+    for (const tag of ['b', 'blockquote', 'a']) {
+      const openMatches = res.match(new RegExp(`<${tag}(?:\\s+[^>]*)?>`, 'gi')) || [];
+      const closeMatches = res.match(new RegExp(`</${tag}>`, 'gi')) || [];
+      assert.equal(openMatches.length, closeMatches.length, `Tag <${tag}> must have balanced closing tags in: ${res}`);
+    }
+  }
+});
+
+test('normalizeButtonUrl: safely converts handles and validates web URLs', () => {
+  assert.equal(normalizeButtonUrl('@rss_ai_ir'), 'https://t.me/rss_ai_ir');
+  assert.equal(normalizeButtonUrl('https://example.com/story'), 'https://example.com/story');
+  assert.equal(normalizeButtonUrl('http://example.com/story'), 'http://example.com/story');
+  assert.equal(normalizeButtonUrl('t.me/digiato/123'), 'https://t.me/digiato/123');
+  assert.equal(normalizeButtonUrl('invalid_random_string'), null);
+  assert.equal(normalizeButtonUrl(null), null);
+  assert.equal(normalizeButtonUrl(''), null);
+});
+
+test('sendRichPostSafe: preserves buttons across photo caption delivery', async () => {
+  sentMessages.length = 0;
+  const longContent = '🔹 <b>تست عنوان</b>\n\n' + 'توضیحات طولانی آزمایشی '.repeat(60);
+  const testButtons = {
+    inline_keyboard: [
+      [{ text: '✅ دکمه تایید', callback_data: 'pub:1:0' }],
+    ],
+  };
+
+  await sendRichPostSafe({
+    chatId: 12345,
+    postHtml: longContent,
+    imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475',
+    buttons: testButtons,
+  });
+
+  assert.equal(sentMessages.length >= 1, true, 'Must have sent message or photo');
+  const lastMsg = sentMessages[sentMessages.length - 1];
+  assert.ok(lastMsg.reply_markup, 'Reply markup must be preserved and not undefined');
+  assert.equal(lastMsg.reply_markup.inline_keyboard[0][0].text, '✅ دکمه تایید');
 });

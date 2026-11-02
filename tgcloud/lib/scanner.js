@@ -223,6 +223,7 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
             aiSummary,
             sourceName: item.sourceName,
             sourceUrl: item.url,
+            imageUrl: item.imageUrl,
             details: parsed.details,
           },
           user,
@@ -273,9 +274,15 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
         );
       } else {
         const reason = draftOnly ? ' (حالت زمان‌بندی انتشار)' : '';
+        const reviewNoticeKb = {
+          inline_keyboard: [
+            [{ text: `📑 بررسی پیش‌نویس‌ها (${publishedCount} خبر جدید)`, callback_data: 'm:review:0' }],
+            [{ text: '🔙 بازگشت به منوی اصلی', callback_data: 'm:menu' }],
+          ],
+        };
         await updateNotifyStatus(
-          `📨 <b>پایش ساعتی تکمیل شد!</b> تعداد <b>${publishedCount}</b> خبر جدید آماده و به صف پیش‌نویس اضافه شد${reason}.\n\n👇 برای مشاهده و انتشار: /review`,
-          reviewPostKeyboard(0)
+          `📨 <b>پایش ساعتی تکمیل شد!</b> تعداد <b>${publishedCount}</b> خبر جدید آماده و به صف پیش‌نویس اضافه شد${reason}.\n\n👇 برای بررسی و انتشار روی دکمه زیر ضربه بزنید یا دستور /review را ارسال کنید:`,
+          reviewNoticeKb
         );
       }
     }
@@ -353,6 +360,7 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
           aiSummary,
           sourceName: item.sourceName,
           sourceUrl: item.url,
+          imageUrl: item.imageUrl,
         },
         user,
       });

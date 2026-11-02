@@ -119,16 +119,115 @@ export function buildBulletinPost({
 }
 
 /**
+ * Normalizes URLs for inline buttons.
+ * Accepts full https?:// URLs, @handles (converted to t.me/handle), or t.me paths.
+ * Rejects invalid strings to prevent Telegram BUTTON_URL_INVALID errors.
+ */
+export function normalizeButtonUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) return trimmed;
+  if (trimmed.startsWith('@')) return `https://t.me/${trimmed.replace('@', '')}`;
+  if (trimmed.startsWith('t.me/')) return `https://${trimmed}`;
+  return null;
+}
+
+/**
+ * Safely truncates HTML text to a target length while guaranteeing:
+ * 1. Tags are never sliced in half.
+ * 2. All open tags are closed in proper reverse order (LIFO).
+ * 3. Resulting string length is strictly <= maxLen.
+ */
+export function truncateHtmlPreservingTags(html, maxLen = 1024) {
+  if (!html || typeof html !== 'string') return '';
+  if (html.length <= maxLen) return html;
+
+  const tagRegex = /<(\/?)([a-zA-Z0-9_\-]+)(?:\s+[^>]*)?>/g;
+  const tokens = [];
+  let lastIdx = 0;
+  let match;
+
+  while ((match = tagRegex.exec(html)) !== null) {
+    if (match.index > lastIdx) {
+      tokens.push({ type: 'text', content: html.slice(lastIdx, match.index) });
+    }
+    tokens.push({
+      type: 'tag',
+      raw: match[0],
+      isClose: match[1] === '/',
+      tag: match[2].toLowerCase(),
+    });
+    lastIdx = match.index + match[0].length;
+  }
+  if (lastIdx < html.length) {
+    tokens.push({ type: 'text', content: html.slice(lastIdx) });
+  }
+
+  let result = '';
+  const stack = [];
+  const reserveEllipsis = '...';
+
+  for (const token of tokens) {
+    if (token.type === 'tag') {
+      if (token.isClose) {
+        const idx = stack.lastIndexOf(token.tag);
+        if (idx !== -1) {
+          stack.splice(idx, 1);
+        }
+        result += token.raw;
+      } else {
+        const closingTagsLen = stack.reduce((acc, t) => acc + t.length + 3, 0) + (token.tag.length + 3);
+        if (result.length + token.raw.length + closingTagsLen + reserveEllipsis.length > maxLen) {
+          result += reserveEllipsis;
+          break;
+        }
+        stack.push(token.tag);
+        result += token.raw;
+      }
+    } else {
+      const closingTagsLen = stack.reduce((acc, t) => acc + t.length + 3, 0);
+      const remainingBudget = maxLen - result.length - closingTagsLen - reserveEllipsis.length;
+
+      if (remainingBudget <= 0) {
+        result += reserveEllipsis;
+        break;
+      }
+
+      if (token.content.length > remainingBudget) {
+        let sliceIdx = remainingBudget;
+        const lastSpace = token.content.lastIndexOf(' ', remainingBudget);
+        if (lastSpace > remainingBudget * 0.7) {
+          sliceIdx = lastSpace;
+        }
+        result += token.content.slice(0, sliceIdx) + reserveEllipsis;
+        break;
+      } else {
+        result += token.content;
+      }
+    }
+  }
+
+  // Close all unclosed tags in reverse order
+  while (stack.length > 0) {
+    const t = stack.pop();
+    result += `</${t}>`;
+  }
+
+  return result;
+}
+
+/**
  * Creates inline buttons for the post (original source link, fast-copy, channel)
  */
 export function buildPostButtons({ sourceUrl, sourceName, summaryToCopy, channelUsername = 'MyLeitner' }) {
   const buttons = [];
 
   const row1 = [];
-  if (sourceUrl) {
+  const validUrl = normalizeButtonUrl(sourceUrl);
+  if (validUrl) {
     row1.push({
       text: `🌐 منبع: ${sourceName || 'لینک خبر'}`,
-      url: sourceUrl,
+      url: validUrl,
     });
   }
   if (summaryToCopy) {
@@ -174,6 +273,7 @@ export function normalizeSafeImageUrl(url) {
 /**
  * Fail-Safe publisher to channel or private chat.
  * Retries with simplified markup if Telegram rejects advanced tags.
+ * Preserves interactive inline buttons across all retry attempts.
  */
 export async function sendRichPostSafe({
   chatId,
@@ -186,13 +286,12 @@ export async function sendRichPostSafe({
   const isPhoto = Boolean(safeImageUrl);
   const maxLen = isPhoto ? 1024 : 4090;
 
-  let safeContent = postHtml;
-  if (safeContent.length > maxLen) {
-    safeContent = safeContent.slice(0, maxLen - 15) + '...';
-  }
+  // Safe truncation that NEVER breaks tags and always closes open tags
+  let safeContent = truncateHtmlPreservingTags(postHtml, maxLen);
 
   // Strictly disable web link previews so images never show as preview cards
   const linkPreviewOpt = { is_disabled: true };
+  let currentButtons = buttons;
 
   // Attempt 1: Full Rich HTML
   try {
@@ -202,14 +301,14 @@ export async function sendRichPostSafe({
         photo: safeImageUrl,
         caption: safeContent,
         parse_mode: 'HTML',
-        reply_markup: buttons || undefined,
+        reply_markup: currentButtons || undefined,
       });
     } else {
       return await api.sendMessage({
         chat_id: chatId,
         text: safeContent,
         parse_mode: 'HTML',
-        reply_markup: buttons || undefined,
+        reply_markup: currentButtons || undefined,
         disable_web_page_preview: true,
         link_preview_options: linkPreviewOpt,
       });
@@ -217,29 +316,28 @@ export async function sendRichPostSafe({
   } catch (err1) {
     console.warn(`sendRichPostSafe: First attempt failed (${err1.message}), retrying...`);
 
-    // If buttons caused failure, drop them on retries
-    let retryButtons = buttons;
+    // If buttons caused failure (e.g. BUTTON_URL_INVALID), drop them on retry
     if (err1.message && err1.message.includes('BUTTON_')) {
-      retryButtons = undefined;
+      currentButtons = undefined;
     }
 
     // Attempt 2: Basic HTML (strip expandable blockquote / complex tags)
     try {
-      const basicHtml = stripToBasicHtml(safeContent);
+      const basicHtml = truncateHtmlPreservingTags(stripToBasicHtml(safeContent), maxLen);
       if (isPhoto) {
         return await api.sendPhoto({
           chat_id: chatId,
           photo: safeImageUrl,
           caption: basicHtml,
           parse_mode: 'HTML',
-          reply_markup: retryButtons || undefined,
+          reply_markup: currentButtons || undefined,
         });
       } else {
         return await api.sendMessage({
           chat_id: chatId,
           text: basicHtml,
           parse_mode: 'HTML',
-          reply_markup: retryButtons || undefined,
+          reply_markup: currentButtons || undefined,
           disable_web_page_preview: true,
           link_preview_options: linkPreviewOpt,
         });
@@ -247,7 +345,11 @@ export async function sendRichPostSafe({
     } catch (err2) {
       console.warn(`sendRichPostSafe: Second attempt failed (${err2.message}), retrying with plain text...`);
 
-      // Attempt 3: Plain text without HTML tags and NO link preview
+      if (err2.message && err2.message.includes('BUTTON_')) {
+        currentButtons = undefined;
+      }
+
+      // Attempt 3: Plain text without HTML tags, but PRESERVING BUTTONS!
       const plain = stripAllHtml(safeContent);
       if (isPhoto) {
         try {
@@ -255,7 +357,7 @@ export async function sendRichPostSafe({
             chat_id: chatId,
             photo: safeImageUrl,
             caption: plain.slice(0, 1020),
-            reply_markup: undefined,
+            reply_markup: currentButtons || undefined,
           });
         } catch (photoErr) {
           console.warn(`sendRichPostSafe: Plain photo attempt failed (${photoErr.message}), falling back to text`);
@@ -264,7 +366,7 @@ export async function sendRichPostSafe({
       return await api.sendMessage({
         chat_id: chatId,
         text: plain.slice(0, 4090),
-        reply_markup: undefined,
+        reply_markup: currentButtons || undefined,
         disable_web_page_preview: true,
         link_preview_options: linkPreviewOpt,
       });
@@ -311,7 +413,8 @@ export function preparePostForPublishing({ post, user, details = null }) {
   // 1. Guaranteed Bottom Section (Source Link + Divider + Footer)
   let bottom = '';
   if (sourceUrl) {
-    bottom += `🔗 <a href="${sourceUrl}">مطالعه متن کامل در ${escHtml(sourceName)}</a>\n\n`;
+    const validLink = normalizeButtonUrl(sourceUrl) || sourceUrl;
+    bottom += `🔗 <a href="${validLink}">مطالعه متن کامل در ${escHtml(sourceName)}</a>\n\n`;
   }
   const safeFooter = (footerText.includes('<') && footerText.includes('>'))
     ? footerText
@@ -323,10 +426,10 @@ export function preparePostForPublishing({ post, user, details = null }) {
 
   // 3. Middle Content Budgeting
   // Telegram photo caption maximum limit is 1024 characters.
-  // We reserve budget so that title + summary + bullets + bottom is strictly <= 980 chars,
-  // ensuring the footer and source link are NEVER truncated or lost.
+  // We reserve budget so that title + summary + bullets + bottom is strictly <= 900 chars,
+  // ensuring the footer, source link, and review queue headers never exceed 1024 chars.
   const hasPhoto = Boolean(post?.imageUrl);
-  const targetMaxLen = hasPhoto ? 980 : 3800;
+  const targetMaxLen = hasPhoto ? 900 : 3800;
   const maxMiddleBudget = targetMaxLen - titlePart.length - bottom.length - 15;
 
   let bulletPart = '';

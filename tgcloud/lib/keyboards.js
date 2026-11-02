@@ -8,6 +8,7 @@ import { computeSignedToken } from 'lib/auth';
 import { TONE_PROFILES } from 'lib/tones';
 import { VALID_CATEGORIES, CATEGORY_LABELS, parseSourceCategories } from 'lib/categories';
 import { parseScheduleWindows, formatScheduleWindowsPersian } from 'lib/schedule';
+import { normalizeButtonUrl } from 'lib/rich_post';
 
 export function buildMiniAppUrl(tgId, botToken = null) {
   const uid = tgId || ADMIN_ID;
@@ -126,7 +127,10 @@ export function reviewPostKeyboard(postId, sourceUrl = '', currentIndex = 0, tot
     { text: '🔁 بازنویسی با مدل دیگر', callback_data: `regen:${postId}:${currentIndex}` },
   ];
   if (sourceUrl) {
-    actRow.push({ text: '🌐 متن اصلی', url: sourceUrl });
+    const validUrl = normalizeButtonUrl(sourceUrl);
+    if (validUrl) {
+      actRow.push({ text: '🌐 متن اصلی', url: validUrl });
+    }
   }
   rows.push(actRow);
 
@@ -202,7 +206,7 @@ export function aiSettingsKeyboard(user, keysList, customProvidersList = []) {
     const tokenDisplay = k.totalTokens ? ` (${Math.round(k.totalTokens / 1000)}k tkn)` : '';
 
     keyboard.push([
-      { text: `${statusIcon} #${idx + 1} ${label}${tokenDisplay}`, callback_data: `noop` },
+      { text: `${statusIcon} #${idx + 1} ${label}${tokenDisplay}`, callback_data: 'act:noop' },
       { text: '⬆️', callback_data: `up:key:${k.id}` },
       { text: '⬇️', callback_data: `dn:key:${k.id}` },
       { text: '🗑️', callback_data: `del:key:${k.id}` },
@@ -221,7 +225,7 @@ export function aiSettingsKeyboard(user, keysList, customProvidersList = []) {
   // Custom Providers with Delete Option
   if (customProvidersList && customProvidersList.length > 0) {
     keyboard.push([
-      { text: '─── 🛠️ ارائه‌دهنده‌های کاستوم ───', callback_data: 'noop' },
+      { text: '─── 🛠️ ارائه‌دهنده‌های کاستوم ───', callback_data: 'act:noop' },
     ]);
     customProvidersList.forEach((cp) => {
       keyboard.push([

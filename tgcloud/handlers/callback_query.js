@@ -255,7 +255,7 @@ export default async function (query) {
     return;
   }
 
-  if (data === 'act:noop') {
+  if (data === 'act:noop' || data === 'noop') {
     return;
   }
 

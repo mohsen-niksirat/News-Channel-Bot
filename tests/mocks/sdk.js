@@ -37,6 +37,10 @@ export const api = {
     sentMessages.push(args);
     return { message_id: Math.floor(Math.random() * 10000) + 1, ...args };
   },
+  sendPhoto: async (args) => {
+    sentMessages.push({ action: 'sendPhoto', ...args });
+    return { message_id: Math.floor(Math.random() * 10000) + 1, ...args };
+  },
   editMessageText: async (args) => {
     sentMessages.push({ action: 'editMessageText', ...args });
     return { message_id: args.message_id };
