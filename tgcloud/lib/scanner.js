@@ -133,14 +133,17 @@ export async function runScanForUser(userId, chatId = null, options = {}) {
     }
   }
 
-  // For candidate items without images (e.g. RSS articles like TechCrunch), extract high-res og:image
-  for (const item of candidateItems) {
-    if (!item.imageUrl && item.url && !item.url.includes('t.me')) {
-      const ogImg = await extractArticleOgImage(item.url);
-      if (ogImg) {
-        item.imageUrl = ogImg;
-      }
-    }
+  // For candidate items without images (e.g. RSS articles like TechCrunch), extract high-res og:image in parallel
+  const ogPromises = candidateItems
+    .filter((item) => !item.imageUrl && item.url && !item.url.includes('t.me'))
+    .map(async (item) => {
+      try {
+        const ogImg = await extractArticleOgImage(item.url);
+        if (ogImg) item.imageUrl = ogImg;
+      } catch {}
+    });
+  if (ogPromises.length > 0) {
+    await Promise.allSettled(ogPromises);
   }
 
   if (candidateItems.length === 0) {

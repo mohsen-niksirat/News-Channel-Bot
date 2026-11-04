@@ -19,6 +19,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Configure tgcloud credentials & Run Daily Digest
         env:
@@ -30,4 +34,14 @@ jobs:
           else
             echo "Warning: TGCLOUD_TOKEN secret is not set yet. Please add it in GitHub Repository Settings -> Secrets and variables -> Actions."
           fi
-          npx @tgcloud/cli@^0.2.0 run tgcloud/endpoints/digest_cron "{}"
+          for attempt in 1 2 3; do
+            echo "==> Digest run attempt $attempt..."
+            if npx tgcloud run tgcloud/endpoints/digest_cron "{}"; then
+              echo "==> Digest finished successfully on attempt $attempt."
+              exit 0
+            fi
+            echo "==> Attempt $attempt encountered transient gateway error. Waiting 5s before retry..."
+            sleep 5
+          done
+          echo "==> All retry attempts failed."
+          exit 1

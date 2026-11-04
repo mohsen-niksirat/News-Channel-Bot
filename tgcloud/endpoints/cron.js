@@ -52,50 +52,41 @@ export default async function (input, ctx) {
     console.log('cron: found users count =', allUsers.length);
     const results = [];
 
-    // Filter candidate users
-    const filteredUsers = allUsers.filter(u => !targetUserId || u.tgId === targetUserId);
+    // Filter candidate users who actually have a channel and automated publishing/schedule enabled
+    const candidateUsers = allUsers.filter(u => 
+      (!targetUserId || u.tgId === targetUserId) &&
+      u.channelId && 
+      (u.autoPublish || u.scheduleWindows)
+    );
 
-    // Run users in bounded concurrency batches of 2
-    const BATCH_SIZE = 2;
-    for (let i = 0; i < filteredUsers.length; i += BATCH_SIZE) {
-      const batch = filteredUsers.slice(i, i + BATCH_SIZE);
-      const batchPromises = batch.map(async (u) => {
-        console.log('cron: checking user', u.tgId, 'channel:', u.channelId, 'autoPublish:', u.autoPublish, 'scheduleWindows:', u.scheduleWindows);
+    console.log('cron: active candidate users =', candidateUsers.length);
+    if (candidateUsers.length === 0) {
+      return { ok: true, results: [], message: 'No active candidate users with auto-publish or schedules' };
+    }
 
-        // Schedule window calculation (Asia/Tehran) with 20-min tolerance
-        // (Allows cron running at :15 and :45 to reliably match all on-the-hour windows)
-        const insideWindow = isInsideScheduleWindow(u.scheduleWindows, new Date(), 20);
-        const draftOnly = !insideWindow;
+    // Run candidate users sequentially to preserve serverless bandwidth & avoid gateway timeouts
+    for (const u of candidateUsers) {
+      console.log('cron: checking user', u.tgId, 'channel:', u.channelId, 'autoPublish:', u.autoPublish, 'scheduleWindows:', u.scheduleWindows);
 
-        if (u.channelId && (u.autoPublish || u.scheduleWindows)) {
-          try {
-            console.log(`cron: calling runScanForUser for ${u.tgId} (insideWindow=${insideWindow}, draftOnly=${draftOnly})`);
-            await runScanForUser(u.tgId, null, { draftOnly, maxSources: 4, maxItems: 2 });
-            console.log('cron: finished runScanForUser for', u.tgId);
-            return {
-              tgId: u.tgId,
-              channel: u.channelId,
-              auto: Boolean(u.autoPublish),
-              insideWindow,
-              draftOnly,
-              status: 'scanned',
-            };
-          } catch (err) {
-            console.error('cron: scan error for', u.tgId, err.message);
-            return { tgId: u.tgId, channel: u.channelId, error: err.message };
-          }
-        } else {
-          return { tgId: u.tgId, status: u.channelId ? 'auto_disabled' : 'no_channel' };
-        }
-      });
+      // Schedule window calculation (Asia/Tehran) with 20-min tolerance
+      const insideWindow = isInsideScheduleWindow(u.scheduleWindows, new Date(), 20);
+      const draftOnly = !insideWindow;
 
-      const settled = await Promise.allSettled(batchPromises);
-      for (const res of settled) {
-        if (res.status === 'fulfilled') {
-          results.push(res.value);
-        } else {
-          results.push({ error: res.reason?.message || 'Unknown batch error' });
-        }
+      try {
+        console.log(`cron: calling runScanForUser for ${u.tgId} (insideWindow=${insideWindow}, draftOnly=${draftOnly})`);
+        await runScanForUser(u.tgId, null, { draftOnly, maxSources: 3, maxItems: 2 });
+        console.log('cron: finished runScanForUser for', u.tgId);
+        results.push({
+          tgId: u.tgId,
+          channel: u.channelId,
+          auto: Boolean(u.autoPublish),
+          insideWindow,
+          draftOnly,
+          status: 'scanned',
+        });
+      } catch (err) {
+        console.error('cron: scan error for', u.tgId, err.message);
+        results.push({ tgId: u.tgId, channel: u.channelId, error: err.message });
       }
     }
 

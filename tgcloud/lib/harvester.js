@@ -216,27 +216,7 @@ export function parseTelegramWebHtml(html, cleanHandle) {
 export async function harvestTelegramChannel(channelHandle, maxPosts = 2, customCache = globalJinaCache) {
   const cleanHandle = channelHandle.replace(/^@/, '').replace(/^(?:https?:\/\/)?(?:t\.me|telegram\.me)\/(?:s\/)?/i, '').trim();
 
-  // Method 1: Google Translate Proxy (Bypasses Telegram AS9009 IP blocks without authentication)
-  try {
-    const gUrl = `https://translate.google.com/translate?sl=auto&tl=fa&u=https://t.me/s/${cleanHandle}`;
-    const gHtml = await cachedFetchText(gUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-    }, fetch, customCache);
-
-    if (gHtml) {
-      const items = parseTelegramWebHtml(gHtml, cleanHandle);
-      if (items.length > 0) {
-        return items.slice(-maxPosts);
-      }
-    }
-  } catch (gErr) {
-    console.warn(`Google proxy harvest failed for @${cleanHandle}:`, gErr.message);
-  }
-
-  // Method 2: Jina Reader Proxy (Bypasses Telegram Serverless egress restrictions on t.me)
+  // Method 1: Jina Reader Proxy (Bypasses Telegram Serverless egress restrictions on t.me)
   try {
     const jinaUrl = `https://r.jina.ai/https://t.me/s/${cleanHandle}`;
     const text = await cachedFetchText(jinaUrl, {
@@ -254,6 +234,26 @@ export async function harvestTelegramChannel(channelHandle, maxPosts = 2, custom
     }
   } catch (jinaErr) {
     console.warn(`Jina proxy harvest failed for @${cleanHandle}:`, jinaErr.message);
+  }
+
+  // Method 2: Google Translate Proxy (Fallback)
+  try {
+    const gUrl = `https://translate.google.com/translate?sl=auto&tl=fa&u=https://t.me/s/${cleanHandle}`;
+    const gHtml = await cachedFetchText(gUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+    }, fetch, customCache);
+
+    if (gHtml) {
+      const items = parseTelegramWebHtml(gHtml, cleanHandle);
+      if (items.length > 0) {
+        return items.slice(-maxPosts);
+      }
+    }
+  } catch (gErr) {
+    console.warn(`Google proxy harvest failed for @${cleanHandle}:`, gErr.message);
   }
 
   // Method 3: Direct t.me/s web preview (Fallback for non-serverless environments)
