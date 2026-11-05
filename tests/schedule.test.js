@@ -5,6 +5,7 @@ import {
   parseScheduleWindows,
   getTehranTime,
   isInsideScheduleWindow,
+  isQuietNightHours,
   formatScheduleWindowsPersian,
 } from '../tgcloud/lib/schedule.js';
 
@@ -84,7 +85,25 @@ test('schedule.js: isInsideScheduleWindow tolerance ±10 min and midnight wrap-a
   assert.strictEqual(isInsideScheduleWindow(midnightWindows, at2350, 10), false);
 });
 
+test('schedule.js: isQuietNightHours detects night quiet hours between 23:30 and 07:30 Tehran time', () => {
+  // 03:25 AM Tehran -> 23:55 UTC previous day -> quiet hours
+  const at325Am = new Date('2026-11-04T23:55:00Z');
+  assert.strictEqual(isQuietNightHours(at325Am), true);
+
+  // 12:57 AM Tehran -> 21:27 UTC previous day -> quiet hours
+  const at1257Am = new Date('2026-11-04T21:27:00Z');
+  assert.strictEqual(isQuietNightHours(at1257Am), true);
+
+  // 10:08 AM Tehran -> 06:38 UTC -> daytime (not quiet hours)
+  const at1008Am = new Date('2026-11-04T06:38:00Z');
+  assert.strictEqual(isQuietNightHours(at1008Am), false);
+
+  // 06:27 PM Tehran -> 14:57 UTC -> daytime (not quiet hours)
+  const at627Pm = new Date('2026-11-04T14:57:00Z');
+  assert.strictEqual(isQuietNightHours(at627Pm), false);
+});
+
 test('schedule.js: formatScheduleWindowsPersian outputs clear summaries', () => {
-  assert.strictEqual(formatScheduleWindowsPersian(null), 'همیشه (بلافاصله پس از هر پایش)');
+  assert.strictEqual(formatScheduleWindowsPersian(null), 'روزانه (۰۷:۳۰ تا ۲۳:۳۰ - شب‌ها در صف بررسی)');
   assert.strictEqual(formatScheduleWindowsPersian(['09:00', '18:00']), 'ساعت 09:00 ، ساعت 18:00');
 });

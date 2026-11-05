@@ -6,6 +6,9 @@ import {
   getTopDigestPostsForUser,
   buildDailyDigestBulletin,
   shouldPublishDailyDigestNow,
+  hasDailyDigestPublishedToday,
+  getTehranDateString,
+  sendDailyDigestForUser,
 } from '../tgcloud/lib/digest.js';
 
 test('digest.js: getTopDigestPostsForUser selects top 8 posts ordered by importance DESC, then recency DESC', async () => {
@@ -102,13 +105,19 @@ test('digest.js: buildDailyDigestBulletin builds formatted morning newspaper bul
   assert.ok(digest.html.includes('📢 کانال خبر: @tech_today'));
 });
 
-test('digest.js: shouldPublishDailyDigestNow respects first window of scheduleWindows', () => {
-  // Case 1: No scheduleWindows -> unrestricted (always true)
+test('digest.js: shouldPublishDailyDigestNow respects morning window and scheduleWindows', () => {
+  // Case 1: No scheduleWindows -> ONLY true during morning hours (07:30 to 11:30 Tehran time)
   const userNoSchedule = { scheduleWindows: null };
-  assert.strictEqual(shouldPublishDailyDigestNow(userNoSchedule), true);
+  const morningDate = new Date('2026-06-15T05:30:00Z'); // 09:00 Tehran -> inside morning window
+  const eveningDate = new Date('2026-06-15T14:51:00Z'); // 18:21 Tehran -> strictly outside morning window!
+  const midnightDate = new Date('2026-06-15T21:00:00Z'); // 00:30 Tehran -> strictly outside morning window!
+
+  assert.strictEqual(shouldPublishDailyDigestNow(userNoSchedule, morningDate), true);
+  assert.strictEqual(shouldPublishDailyDigestNow(userNoSchedule, eveningDate), false);
+  assert.strictEqual(shouldPublishDailyDigestNow(userNoSchedule, midnightDate), false);
 
   // Case 2: User with multiple scheduleWindows (e.g. 09:00 and 18:00)
-  // Simplest correct rule: daily digest publishes at the FIRST window of the day (09:00 Tehran)
+  // Daily digest publishes at the FIRST window of the day (09:00 Tehran)
   const userWithSchedule = { scheduleWindows: JSON.stringify(['09:00', '18:00']) };
 
   // 09:00 Tehran is 05:30 UTC
@@ -118,4 +127,31 @@ test('digest.js: shouldPublishDailyDigestNow respects first window of scheduleWi
   // Outside first window (e.g. at 14:00 Tehran = 10:30 UTC)
   const outsideFirstWindow = new Date('2026-06-15T10:30:00Z');
   assert.strictEqual(shouldPublishDailyDigestNow(userWithSchedule, outsideFirstWindow), false);
+});
+
+test('digest.js: hasDailyDigestPublishedToday correctly identifies already-published daily digests', async () => {
+  resetMockDb();
+
+  const userId = 25;
+  await db.insert(users).values({
+    id: userId,
+    tgId: 2500,
+    name: 'DigestTester2',
+    channelId: '@my_test_chan',
+  }).run();
+
+  const dateStr = getTehranDateString();
+  assert.strictEqual(await hasDailyDigestPublishedToday(userId), false);
+
+  // Record a published digest
+  await db.insert(posts).values({
+    userId,
+    sourceName: 'newspaper',
+    originalTitle: 'روزنامه صبحگاهی',
+    originalHash: `digest_${userId}_${dateStr}`,
+    status: 'published',
+    publishedAt: Math.floor(Date.now() / 1000),
+  }).run();
+
+  assert.strictEqual(await hasDailyDigestPublishedToday(userId), true);
 });

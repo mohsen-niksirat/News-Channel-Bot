@@ -3,7 +3,7 @@
 
 import { db } from 'sdk';
 import { users } from 'schema';
-import { shouldPublishDailyDigestNow, sendDailyDigestForUser } from 'lib/digest';
+import { shouldPublishDailyDigestNow, sendDailyDigestForUser, hasDailyDigestPublishedToday } from 'lib/digest';
 
 export default async function (input, ctx) {
   console.log('digest_cron: started with input', JSON.stringify(input));
@@ -26,8 +26,14 @@ export default async function (input, ctx) {
 
         const canPublish = shouldPublishDailyDigestNow(u);
         if (!canPublish) {
-          console.log(`digest_cron: user ${u.tgId} outside first schedule window. Skipping.`);
-          return { tgId: u.tgId, status: 'outside_schedule_window' };
+          console.log(`digest_cron: user ${u.tgId} outside morning schedule window. Skipping.`);
+          return { tgId: u.tgId, status: 'outside_morning_window' };
+        }
+
+        const alreadyPublished = await hasDailyDigestPublishedToday(u.tgId);
+        if (alreadyPublished) {
+          console.log(`digest_cron: user ${u.tgId} already received today's daily digest. Skipping.`);
+          return { tgId: u.tgId, status: 'already_published_today' };
         }
 
         try {

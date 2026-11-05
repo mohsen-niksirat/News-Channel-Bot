@@ -3,12 +3,52 @@
 // Formats via buildBulletinPost and publishes according to scheduleWindows
 
 import { db, api } from 'sdk';
-import { eq, or } from 'sdk/db';
+import { eq, and, or } from 'sdk/db';
 import { posts } from 'schema';
 import { getUser } from 'lib/db';
 import { buildBulletinPost, sendRichPostSafe, escHtml } from 'lib/rich_post';
-import { isInsideScheduleWindow, parseScheduleWindows } from 'lib/schedule';
+import { getTehranTime, isInsideScheduleWindow, parseScheduleWindows } from 'lib/schedule';
 import { mainMenuKeyboard } from 'lib/keyboards';
+
+/**
+ * Returns YYYY-MM-DD formatted date string in Asia/Tehran timezone.
+ * @param {Date} [date]
+ * @returns {string}
+ */
+export function getTehranDateString(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return formatter.format(date); // YYYY-MM-DD
+}
+
+/**
+ * Checks whether today's daily morning digest has already been published to the channel.
+ * @param {number} userId
+ * @param {Date} [date]
+ * @returns {Promise<boolean>}
+ */
+export async function hasDailyDigestPublishedToday(userId, date = new Date()) {
+  const u = await getUser(userId);
+  const targetId = u ? u.id : userId;
+  const dateStr = getTehranDateString(date);
+  const digestHash = `digest_${targetId}_${dateStr}`;
+
+  const existing = await db
+    .select()
+    .from(posts)
+    .where(and(
+      or(eq(posts.userId, userId), eq(posts.userId, targetId)),
+      eq(posts.originalHash, digestHash),
+      eq(posts.status, 'published')
+    ))
+    .get();
+
+  return Boolean(existing);
+}
 
 /**
  * Selects the top N posts from the last 24 hours for a user,
@@ -94,14 +134,19 @@ export function buildDailyDigestBulletin({ user, posts = [], date = new Date() }
  * @returns {boolean}
  */
 export function shouldPublishDailyDigestNow(user, now = new Date()) {
+  const { totalMinutes } = getTehranTime(now);
+
   const windows = parseScheduleWindows(user?.scheduleWindows);
-  if (!windows || windows.length === 0) {
-    return true; // No window set -> unrestricted publish
+  if (windows && windows.length > 0) {
+    // If user has specific schedule windows, publish at the first window of the day
+    const firstWindow = windows[0];
+    return isInsideScheduleWindow([firstWindow], now, 20);
   }
 
-  // Publish at the first scheduled window of the day
-  const firstWindow = windows[0];
-  return isInsideScheduleWindow([firstWindow], now, 15);
+  // If no custom schedule is set, morning newspaper publishes ONLY during morning hours:
+  // 07:30 to 11:30 AM Tehran time (450 to 690 totalMinutes).
+  // Outside this morning range (e.g. afternoon or evening), NEVER publish!
+  return totalMinutes >= 450 && totalMinutes <= 690;
 }
 
 /**
@@ -126,14 +171,39 @@ export async function sendDailyDigestForUser(userId, chatId = null, publishToCha
 
   // Publish to channel if requested and allowed
   if (publishToChannel && !digest.empty && user.channelId) {
-    const sent = await sendRichPostSafe({
-      chatId: user.channelId,
-      postHtml: digest.html,
-      buttons: null,
-      disableWebPagePreview: true,
-    });
-    if (sent && sent.message_id) {
-      published = true;
+    const alreadyPublished = await hasDailyDigestPublishedToday(userId);
+    if (alreadyPublished) {
+      console.log(`sendDailyDigestForUser: daily digest already published today for user ${userId}. Skipping channel publication.`);
+      published = false;
+    } else {
+      const sent = await sendRichPostSafe({
+        chatId: user.channelId,
+        postHtml: digest.html,
+        buttons: null,
+        disableWebPagePreview: true,
+      });
+      if (sent && sent.message_id) {
+        published = true;
+        // Record published digest in posts table to prevent duplicate publications today
+        try {
+          const dateStr = getTehranDateString();
+          await db.insert(posts).values({
+            userId: user.id || userId,
+            sourceName: 'newspaper',
+            sourceUrl: user.channelId,
+            originalTitle: `روزنامه صبحگاهی (${new Date().toLocaleDateString('fa-IR')})`,
+            originalHash: `digest_${user.id || userId}_${dateStr}`,
+            aiTitle: 'روزنامه صبحگاهی',
+            aiSummary: `مجموعه ${digest.count} خبر برگزیده روز`,
+            formattedHtml: digest.html,
+            status: 'published',
+            publishedMessageId: sent.message_id,
+            publishedAt: Math.floor(Date.now() / 1000),
+          }).run();
+        } catch (dbErr) {
+          console.warn('Failed to record digest in posts table:', dbErr.message);
+        }
+      }
     }
   }
 

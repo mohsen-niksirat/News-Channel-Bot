@@ -1,8 +1,8 @@
 import { api, db } from 'sdk';
 import { users } from 'schema';
 import { runScanForUser } from 'lib/scanner';
-import { isInsideScheduleWindow } from 'lib/schedule';
-import { shouldPublishDailyDigestNow, sendDailyDigestForUser } from 'lib/digest';
+import { isInsideScheduleWindow, isQuietNightHours, parseScheduleWindows } from 'lib/schedule';
+import { shouldPublishDailyDigestNow, sendDailyDigestForUser, hasDailyDigestPublishedToday } from 'lib/digest';
 import { runNightlyKeyHealthCheck } from 'lib/health_check';
 
 export default async function (input, ctx) {
@@ -36,7 +36,14 @@ export default async function (input, ctx) {
     const results = [];
     for (const u of candidateUsers) {
       if (!u.channelId) continue;
-      if (!shouldPublishDailyDigestNow(u)) continue;
+      if (!shouldPublishDailyDigestNow(u)) {
+        console.log(`cron: user ${u.tgId} outside morning window for digest`);
+        continue;
+      }
+      if (await hasDailyDigestPublishedToday(u.tgId)) {
+        console.log(`cron: user ${u.tgId} already published daily digest today`);
+        continue;
+      }
       try {
         const res = await sendDailyDigestForUser(u.tgId, null, true);
         results.push({ tgId: u.tgId, ...res });
@@ -68,12 +75,14 @@ export default async function (input, ctx) {
     for (const u of candidateUsers) {
       console.log('cron: checking user', u.tgId, 'channel:', u.channelId, 'autoPublish:', u.autoPublish, 'scheduleWindows:', u.scheduleWindows);
 
-      // Schedule window calculation (Asia/Tehran) with 20-min tolerance
+      // Schedule window calculation (Asia/Tehran) with 20-min tolerance & quiet hours guard
+      const hasCustomSchedule = Boolean(parseScheduleWindows(u.scheduleWindows));
       const insideWindow = isInsideScheduleWindow(u.scheduleWindows, new Date(), 20);
-      const draftOnly = !insideWindow;
+      const isQuiet = !hasCustomSchedule && isQuietNightHours(new Date());
+      const draftOnly = !insideWindow || isQuiet;
 
       try {
-        console.log(`cron: calling runScanForUser for ${u.tgId} (insideWindow=${insideWindow}, draftOnly=${draftOnly})`);
+        console.log(`cron: calling runScanForUser for ${u.tgId} (insideWindow=${insideWindow}, isQuiet=${isQuiet}, draftOnly=${draftOnly})`);
         await runScanForUser(u.tgId, null, { draftOnly, maxSources: 3, maxItems: 2 });
         console.log('cron: finished runScanForUser for', u.tgId);
         results.push({
@@ -81,6 +90,7 @@ export default async function (input, ctx) {
           channel: u.channelId,
           auto: Boolean(u.autoPublish),
           insideWindow,
+          isQuiet,
           draftOnly,
           status: 'scanned',
         });

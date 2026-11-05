@@ -60,6 +60,18 @@ export function getTehranTime(date = new Date()) {
 }
 
 /**
+ * Checks whether the current time in Asia/Tehran is within quiet night hours (23:30 to 07:30).
+ * Prevents automated channel broadcasting in the middle of the night.
+ * @param {Date} [date]
+ * @returns {boolean}
+ */
+export function isQuietNightHours(date = new Date()) {
+  const { totalMinutes } = getTehranTime(date);
+  // 23:30 is 1410 min, 07:30 is 450 min
+  return totalMinutes >= 1410 || totalMinutes < 450;
+}
+
+/**
  * Checks whether the given date/time is within tolerance of any schedule window.
  * Default tolerance is 10 minutes (±10 min).
  * Handles midnight wrap-around (e.g. 23:55 to 00:05).
@@ -103,7 +115,7 @@ export function isInsideScheduleWindow(windows, date = new Date(), toleranceMinu
 export function formatScheduleWindowsPersian(windows) {
   const parsed = parseScheduleWindows(windows);
   if (!parsed || parsed.length === 0) {
-    return 'همیشه (بلافاصله پس از هر پایش)';
+    return 'روزانه (۰۷:۳۰ تا ۲۳:۳۰ - شب‌ها در صف بررسی)';
   }
   return parsed.map((t) => `ساعت ${t}`).join(' ، ');
 }
